@@ -16,12 +16,17 @@ var head: Node3D
 var tail: Node3D
 var legs: Array[Dictionary] = []   # {hip, knee, front: bool, side: float}
 var phase := 0.0
+## Pose overrides, set by the owner each frame: raise the front-right paw (swipe), lunge stretch.
+var paw := 0.0
+var lunge := 0.0
+var mane_mat: StandardMaterial3D
 var _crouch := 0.0
 var _neck_pitch := 0.0
 
 
 ## Spec keys: body_len, body_r, leg_len, leg_r, neck_len, neck_r, neck_pitch, head_r,
 ## head_len, tail_len, ear, horns, coat (Dictionary of shader params), stride.
+## Optional: mane (bool), back_slope (radians, + = shoulders higher), tusks (bool), horn_scale.
 func build(spec: Dictionary) -> void:
 	p = spec
 	var coat := ShaderMaterial.new()
@@ -86,11 +91,33 @@ func build(spec: Dictionary) -> void:
 		ear.position = Vector3(side * p.head_r * 0.55, p.head_r * 0.75, p.head_r * 0.1)
 		ear.rotation.z = -side * 0.5
 		head.add_child(ear)
+		if p.get("tusks", false):
+			var tusk := _mesh(_cyl(0.003, p.head_r * 0.07, p.head_r * 0.7, 5), _ivory())
+			tusk.position = Vector3(side * p.head_r * 0.35, -p.head_r * 0.15, -p.head_r * (0.9 + p.head_len * 0.5))
+			tusk.rotation = Vector3(-0.3, 0, side * 0.7)
+			head.add_child(tusk)
 		if p.get("horns", false):
-			var horn := _mesh(_cyl(0.004, p.head_r * 0.12, p.head_r * 2.6, 5), dark)
+			var hs: float = p.get("horn_scale", 1.0)
+			var horn := _mesh(_cyl(0.004, p.head_r * 0.12 * hs, p.head_r * 2.6 * hs, 5), dark)
 			horn.position = Vector3(side * p.head_r * 0.3, p.head_r * 1.6, p.head_r * 0.45)
 			horn.rotation = Vector3(-0.45, 0, -side * 0.12)
 			head.add_child(horn)
+
+	if p.get("mane", false):
+		mane_mat = StandardMaterial3D.new()
+		mane_mat.roughness = 0.95
+		var ring := _mesh(_sphere(p.neck_r * 1.9), mane_mat)
+		ring.position.y = p.neck_len * 0.55
+		ring.scale = Vector3(1.15, 1.1, 0.9)
+		neck.add_child(ring)
+		var ruff := _mesh(_sphere(p.head_r * 1.35), mane_mat)
+		ruff.position = Vector3(0, p.head_r * 0.15, p.head_r * 0.45)
+		ruff.scale = Vector3(1.25, 1.2, 0.8)
+		head.add_child(ruff)
+		var chest_mane := _mesh(_sphere(p.neck_r * 1.3), mane_mat)
+		chest_mane.position = Vector3(0, -r * 0.2, -L * 0.48)
+		torso.add_child(chest_mane)
+		set_mane(0.0)
 
 	tail = Node3D.new()
 	tail.position = Vector3(0, r * 0.35, L * 0.48)
@@ -128,6 +155,18 @@ func _build_leg(front: bool, side: float, coat: Material, dark: Material) -> Dic
 	return {"hip": hip, "knee": knee, "front": front, "side": side}
 
 
+## darkness 0..1: a young lion's sandy mane to a prime male's near-black one.
+func set_mane(darkness: float) -> void:
+	if mane_mat:
+		mane_mat.albedo_color = Color(0.95, 0.80, 0.52).lerp(Color(0.16, 0.08, 0.04), darkness)
+
+
+func _ivory() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.93, 0.89, 0.78)
+	return m
+
+
 ## speed_norm: 0 idle .. ~0.3 walk .. 1 full gallop.
 ## crouch: 0..1. head_down: 0..1 (grazing). Call every frame.
 func animate(delta: float, speed: float, speed_norm: float, crouch: float, head_down := 0.0) -> void:
@@ -149,12 +188,18 @@ func animate(delta: float, speed: float, speed_norm: float, crouch: float, head_
 		var knee: Node3D = l.knee
 		hip.rotation.x = swing + _crouch * (0.6 if l.front else 0.9)
 		var k := -lift * 1.1 - _crouch * 1.4
+		if l.front:
+			# Lunge reaches both forelegs out; a swipe raises the right paw high.
+			hip.rotation.x += lunge * 1.1
+			if l.side > 0:
+				hip.rotation.x += paw * 1.6
+				k -= paw * 0.9
 		if not l.front:
 			k = -k * 0.8
 		knee.rotation.x = k
 
 	# Spine flex and bob at a gallop, lower body when crouched.
-	torso.rotation.x = sin(phase * 2.0) * 0.07 * gallop
+	torso.rotation.x = sin(phase * 2.0) * 0.07 * gallop + p.get("back_slope", 0.0) + paw * 0.25 - lunge * 0.15
 	var base_y: float = p.leg_len + p.body_r * 0.3
 	torso.position.y = base_y - _crouch * p.leg_len * 0.38 + absf(sin(phase)) * 0.06 * amp
 	var target_pitch: float = lerpf(p.neck_pitch, -1.9, head_down)

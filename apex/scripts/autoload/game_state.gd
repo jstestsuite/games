@@ -1,31 +1,42 @@
 extends Node
-## Run state for one season, plus the trait (upgrade) system and input setup.
+## Run state for one lion's life, plus the trait (upgrade) system and input setup.
 
 signal hunger_changed(value: float)
 signal message(text: String)
 signal kill_made(total: int)
 
 enum Phase { TITLE, HUNTING, NIGHT, GAME_OVER, VICTORY }
+## NOMAD: alone. CHALLENGE: the day you fight for a pride. PRIDE: you lead it.
+enum Act { NOMAD, CHALLENGE, PRIDE }
 
 var phase: Phase = Phase.TITLE
+var act: Act = Act.NOMAD
 var day := 1
 var day_time := 0.0          # seconds into the current day
 var hunger := 0.0
+var strength := 1.0
 var kills := 0
 var kills_today := 0
+var rivals_beaten := 0
+var pride_food := 0.0        # food the lionesses ate today
+var lionesses := 0           # how many still follow you
 var traits: Array[String] = []
 
-## Trait definitions. "mods" multiply Tuning values looked up through mod().
+## Trait definitions. "mods" multiply values looked up through mod().
 const TRAITS := {
-	"long_lungs":   {"name": "Long Lungs",    "desc": "+35% sprint stamina.",                   "mods": {"stamina": 1.35}},
-	"silent_paws":  {"name": "Silent Paws",   "desc": "Stalking is 40% harder to notice.",      "mods": {"stalk_noise": 0.6}},
-	"coiled":       {"name": "Coiled Spring", "desc": "Pounce reaches 40% further.",            "mods": {"pounce_range": 1.4}},
-	"iron_gut":     {"name": "Iron Gut",      "desc": "Hunger drains 25% slower.",              "mods": {"hunger_drain": 0.75}},
-	"burst":        {"name": "Burst",         "desc": "+8% top sprint speed.",                  "mods": {"sprint_speed": 1.08}},
-	"tight_turns":  {"name": "Tight Turns",   "desc": "Turn 40% sharper while sprinting.",      "mods": {"sprint_turn": 1.4}},
-	"second_wind":  {"name": "Second Wind",   "desc": "Rest and kills restore 50% more stamina.", "mods": {"stamina_regen": 1.5}},
-	"downwind":     {"name": "Downwind",      "desc": "Your scent carries half as strongly.",   "mods": {"scent": 0.5}},
-	"big_stomach":  {"name": "Big Stomach",   "desc": "Each kill feeds you 30% more.",          "mods": {"food": 1.3}},
+	"thick_mane":  {"name": "Thick Mane",   "desc": "Take 20% less damage from lions.",            "mods": {"damage_taken": 0.8}},
+	"heavy_paws":  {"name": "Heavy Paws",   "desc": "Swipes hit 35% harder.",                      "mods": {"swipe_damage": 1.35}},
+	"crushing_jaws": {"name": "Crushing Jaws", "desc": "Lunges hit 30% harder. Takedowns 25% faster.", "mods": {"lunge_damage": 1.3, "takedown": 1.25}},
+	"long_charge": {"name": "Long Charge",  "desc": "Your burst lasts 40% longer.",                "mods": {"charge_time": 1.4}},
+	"deep_lungs":  {"name": "Deep Lungs",   "desc": "Run 50% longer before you're winded.",        "mods": {"run_time": 1.5}},
+	"silent_paws": {"name": "Silent Paws",  "desc": "Stalking is 40% harder to notice.",           "mods": {"stalk_noise": 0.6}},
+	"downwind":    {"name": "Downwind",     "desc": "Your scent carries half as strongly.",        "mods": {"scent": 0.5}},
+	"iron_gut":    {"name": "Iron Gut",     "desc": "Hunger drains 25% slower.",                   "mods": {"hunger_drain": 0.75}},
+	"gorger":      {"name": "Gorger",       "desc": "Eat 50% faster. Meals build 25% more strength.", "mods": {"eat_rate": 1.5, "strength_gain": 1.25}},
+	"thunder":     {"name": "Thunder Roar", "desc": "Roar reaches 50% further and recharges faster.", "mods": {"roar_radius": 1.5, "roar_cd": 0.6}},
+	"quick_feet":  {"name": "Quick Feet",   "desc": "Dodge recharges 40% faster.",                 "mods": {"dodge_cd": 0.6}},
+	"tough_hide":  {"name": "Tough Hide",   "desc": "Kicks, horns and hyena bites hurt 40% less.", "mods": {"beast_damage": 0.6}},
+	"fast_healer": {"name": "Fast Healer",  "desc": "Heal 60% faster, day and night.",             "mods": {"health_regen": 1.6}},
 }
 
 
@@ -43,13 +54,26 @@ func mod(key: String) -> float:
 
 func new_run() -> void:
 	day = 1
+	act = Act.NOMAD
 	day_time = 0.0
 	hunger = Tuning.HUNGER_START
+	strength = Tuning.STRENGTH_START
 	kills = 0
 	kills_today = 0
+	rivals_beaten = 0
+	pride_food = 0.0
+	lionesses = 0
 	traits.clear()
 	phase = Phase.HUNTING
 	hunger_changed.emit(hunger)
+
+
+func challenge_day() -> int:
+	return Tuning.NOMAD_DAYS + 1
+
+
+func last_day() -> int:
+	return challenge_day() + Tuning.PRIDE_DAYS
 
 
 func add_hunger(amount: float) -> void:
@@ -57,12 +81,26 @@ func add_hunger(amount: float) -> void:
 	hunger_changed.emit(hunger)
 
 
-func register_kill() -> void:
+func add_strength(amount: float) -> void:
+	strength = clampf(strength + amount, 0.1, Tuning.STRENGTH_MAX)
+
+
+## Food eaten by the player: feeds you and builds strength.
+func eat(amount: float) -> void:
+	add_hunger(amount)
+	add_strength(amount * Tuning.STRENGTH_PER_FOOD * mod("strength_gain"))
+
+
+func register_kill(species_name: String) -> void:
 	kills += 1
 	kills_today += 1
-	add_hunger(Tuning.GAZELLE_FOOD * mod("food"))
 	kill_made.emit(kills)
-	message.emit("Kill! +%d food" % int(Tuning.GAZELLE_FOOD * mod("food")))
+	message.emit("%s down!" % species_name)
+
+
+## 0 = pale young mane, 1 = the darkest mane strength allows.
+func mane_darkness() -> float:
+	return clampf((strength - Tuning.STRENGTH_START) / maxf(0.01, Tuning.STRENGTH_MAX - Tuning.STRENGTH_START), 0.0, 1.0)
 
 
 ## Three random traits the player doesn't own yet.
@@ -83,16 +121,45 @@ func _setup_input() -> void:
 	_bind("sprint", [KEY_SHIFT])
 	_bind("stalk", [KEY_CTRL, KEY_C])
 	_bind("pounce", [KEY_SPACE])
+	_bind("swipe", [KEY_F])
+	_bind("dodge", [KEY_ALT, KEY_V])
+	_bind("roar", [KEY_Q])
+	_bind("eat", [KEY_E])
 	_bind("restart", [KEY_R])
 	_bind("pause", [KEY_ESCAPE])
+	_bind("tuning", [KEY_F1])
 	_bind("choice_1", [KEY_1])
 	_bind("choice_2", [KEY_2])
 	_bind("choice_3", [KEY_3])
 	_bind("start", [KEY_ENTER, KEY_SPACE])
-	# Mouse: left click also pounces.
-	var mb := InputEventMouseButton.new()
-	mb.button_index = MOUSE_BUTTON_LEFT
-	InputMap.action_add_event("pounce", mb)
+	_bind_mouse("swipe", MOUSE_BUTTON_LEFT)
+	_bind_mouse("dodge", MOUSE_BUTTON_RIGHT)
+
+	# Controller (Xbox names; PlayStation is the same positions).
+	# Left stick move, right stick look, RT sprint, LT stalk, A pounce (hold to grip),
+	# X swipe, B dodge, Y roar, RB eat, Start pause / restart, D-pad left/up/right = night choices.
+	_bind_axis("move_left", JOY_AXIS_LEFT_X, -1.0)
+	_bind_axis("move_right", JOY_AXIS_LEFT_X, 1.0)
+	_bind_axis("move_forward", JOY_AXIS_LEFT_Y, -1.0)
+	_bind_axis("move_back", JOY_AXIS_LEFT_Y, 1.0)
+	_bind_axis("look_left", JOY_AXIS_RIGHT_X, -1.0)
+	_bind_axis("look_right", JOY_AXIS_RIGHT_X, 1.0)
+	_bind_axis("look_up", JOY_AXIS_RIGHT_Y, -1.0)
+	_bind_axis("look_down", JOY_AXIS_RIGHT_Y, 1.0)
+	_bind_axis("sprint", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	_bind_axis("stalk", JOY_AXIS_TRIGGER_LEFT, 1.0)
+	_bind_joy("pounce", JOY_BUTTON_A)
+	_bind_joy("swipe", JOY_BUTTON_X)
+	_bind_joy("dodge", JOY_BUTTON_B)
+	_bind_joy("roar", JOY_BUTTON_Y)
+	_bind_joy("eat", JOY_BUTTON_RIGHT_SHOULDER)
+	_bind_joy("pause", JOY_BUTTON_START)
+	_bind_joy("restart", JOY_BUTTON_START)
+	_bind_joy("start", JOY_BUTTON_A)
+	_bind_joy("start", JOY_BUTTON_START)
+	_bind_joy("choice_1", JOY_BUTTON_DPAD_LEFT)
+	_bind_joy("choice_2", JOY_BUTTON_DPAD_UP)
+	_bind_joy("choice_3", JOY_BUTTON_DPAD_RIGHT)
 
 
 func _bind(action: String, keys: Array) -> void:
@@ -102,3 +169,28 @@ func _bind(action: String, keys: Array) -> void:
 		var ev := InputEventKey.new()
 		ev.physical_keycode = k
 		InputMap.action_add_event(action, ev)
+
+
+func _bind_joy(action: String, button: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = button
+	InputMap.action_add_event(action, ev)
+
+
+func _bind_axis(action: String, axis: JoyAxis, value: float) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	var ev := InputEventJoypadMotion.new()
+	ev.axis = axis
+	ev.axis_value = value
+	InputMap.action_add_event(action, ev)
+
+
+func _bind_mouse(action: String, button: MouseButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	var mb := InputEventMouseButton.new()
+	mb.button_index = button
+	InputMap.action_add_event(action, mb)

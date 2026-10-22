@@ -9,6 +9,9 @@ uniform float spot_scale = 7.0;
 uniform float spot_amount = 0.0;      // 0 = no spots, ~0.3 = cheetah
 uniform float belly_height = 0.55;    // body-local y below which the belly colour fades in
 uniform float roughness_val = 0.85;
+uniform vec3 stripe_color : source_color = vec3(0.05, 0.05, 0.05);
+uniform float stripe_amount = 0.0;    // 0 = none, ~0.5 = zebra
+uniform float stripe_scale = 22.0;
 
 varying vec3 v_local;
 
@@ -44,6 +47,12 @@ void fragment() {
 		float d = cell_dist(v_local * spot_scale);
 		float spot = 1.0 - smoothstep(spot_amount - 0.05, spot_amount + 0.02, d);
 		col = mix(col, spot_color, spot * (1.0 - belly * 0.7));
+	}
+	if (stripe_amount > 0.0) {
+		// Bands across the body, wobbled by a little noise so they don't look ruled.
+		float w = sin(v_local.z * stripe_scale + sin(v_local.y * 9.0) * 1.4 + cell_dist(v_local * 3.0) * 2.0);
+		float stripe = smoothstep(1.0 - stripe_amount * 2.0, 1.0 - stripe_amount * 2.0 + 0.15, w * 0.5 + 0.5);
+		col = mix(col, stripe_color, stripe * (1.0 - belly * 0.4));
 	}
 	ALBEDO = col;
 	ROUGHNESS = roughness_val;
