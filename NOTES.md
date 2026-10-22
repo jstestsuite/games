@@ -42,6 +42,7 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | Justin isn't committed to the lion idea. Scrapping it and starting over is fine if a better idea comes up | Justin, after the v3 playtest |
 | 2026-10-22 | **On hold:** no game changes until we agree on what's missing. A design panel proposed a greybox "ride" test room, cutting most of v3's systems, and asking the brother 5 questions first | Developer paused after the v3 playtest. The proposal is in `design-panel-2026-10-22.md`, not yet accepted |
 | 2026-10-22 | At most 2 hyenas wind up or dart at once; the clan grows by 0.5 per day, not 1 | The soak test showed 7 hyenas biting together killed a strong lion in ~25 s: unreadable, not hard-but-fair |
 | 2026-10-22 | Test kit: soak test, input test, saved probe results, `tools/run_tests.sh`, GitHub check on push | Developer: "anything useful for future development" |

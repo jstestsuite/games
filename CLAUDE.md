@@ -8,4 +8,4 @@ Game drafts made by the developer (who playtests and decides) and Claude (who im
 - **Check your work** with `tools/run_tests.sh <draft>` (add `--probes` after balance changes, and commit the updated `tests/results/`).
 - **Each draft is a self-contained Godot project in its own folder.** Point commands at it with `--path <draft>`.
 - **End of session:** add any decisions to the log in `NOTES.md`, and any playtest feedback to the draft's `PLAYTEST.md`. The next session starts from those files.
-- **Never guess the developer's name or pronouns.** Say "the developer".
+- **The developer is Justin.** Their pronouns haven't been stated: use the name, or they/them.
