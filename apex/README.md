@@ -1,6 +1,6 @@
 # APEX
 
-A predator roguelite prototype. You're a young lion driven out of your pride. Grow strong, take a pride on day 4, and hold it through the last dusk. A run takes about 15 minutes.
+A predator roguelite prototype. You're a young lion driven out of your pride. Grow strong, take a pride on day 3, and hold it through the last dusk. A run takes about 10–12 minutes.
 
 ## Run it
 
@@ -16,7 +16,7 @@ A predator roguelite prototype. You're a young lion driven out of your pride. Gr
 | Mouse | Right stick | Camera |
 | Ctrl (or C) | LT | Stalk: slow, low, quiet |
 | Shift | RT | Sprint: a ~2 s charge that fades into a slower run |
-| Space | A | Pounce. **Hold** it to keep your grip in a takedown |
+| Space | A | Pounce (2 in reserve, they recharge). **Hold** it to stay on in a grapple or clinch |
 | Left click / F | X | Swipe |
 | Right click / Alt | B | Dodge |
 | Q | Y | Roar (scatters hyenas, spooks prey) |
@@ -31,10 +31,11 @@ A predator roguelite prototype. You're a young lion driven out of your pride. Gr
 - **Wind:** watch the compass (top right). The arrow shows where the wind blows; approach so it blows from the prey toward you.
 - **Cover:** tall grass hides you. Move while their heads are down.
 - **Warnings:** `?` means suspicious, `!` means running.
-- **The charge is short.** Get within about 20 m before you sprint. Young (small) animals are slower, and your run can catch them.
-- **Takedowns:** after the pounce lands, hold the button until the animal goes down. Buffalo fight back.
-- **Hyenas** come to your kills. Eat fast, fight them, or roar.
-- **Rival lions:** `!` (yellow) means a swipe is coming, `!!` (red) a lunge. Dodge, and punish him while he recovers.
+- **The charge is short.** Get within about 15 m before you sprint. Young (small) animals are slower, and your run can catch them.
+- **Grapples:** when a pounce lands, hold the button and **push the stick the way the arrow points** each time the animal lurches. Miss and you lose grip and get kicked; lose all your grip and you're thrown, maybe injured.
+- **Pick your fight:** the animal you're facing shows **EASY / FAIR / RISKY / DEADLY**. Zebras are fair on day 1; wildebeest are a gamble; buffalo need your pride.
+- **Hyenas** shadow you all day and come to your kills. Eat fast, fight them, or roar. When you're full you can keep **gorging**, which turns food into strength.
+- **Rival lions:** `!` (yellow) means a swipe is coming, `!!` (red) a lunge. Dodge it. Pounce on him to start a **clinch**: push *with* yellow arrows, *away* from red ones, and pin him.
 - **Strength:** eating makes you stronger and darkens your mane. The pride male is strong; you'll need to be too.
 
 ## Tuning

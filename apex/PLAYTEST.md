@@ -18,7 +18,18 @@ F1 changes:
 Ideas:
 ```
 
-## What to watch for in the first lion playtest
+## What to watch for in the grapple playtest (v3, session 2)
+
+- **The grapple:** still fun on the tenth animal? Can you read the arrow in time on a controller? Do fake-outs feel fair or cheap?
+- **Tiers:** is a day-1 zebra a fair test, a day-1 wildebeest a real gamble, and a solo buffalo clearly a bad idea? Did the risk label help you choose?
+- **Clinch:** does it feel different from prey? Is "push away from red" readable?
+- **Pounce reserve:** is 2 pounces right? Does the sprawl on a miss feel punishing or annoying?
+- **Danger:** did kicks, throws, injuries and buffalo charges make hunting feel risky?
+- **Hyenas:** pressure now, or still nothing?
+- **Food:** did you ever feel hungry? Did gorging matter?
+- **Run length** at 4 days: too short now?
+
+## What to watch for in the first lion playtest (v2, done)
 
 These are the open risks. Each one is a guess until someone plays.
 

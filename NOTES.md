@@ -25,9 +25,14 @@ This is our working guess. Confirm or correct it after he plays.
 | Draft | Where | Status | Pitch |
 |---|---|---|---|
 | APEX v1: cheetah | `apex/` at commit `aac0794` (`git checkout aac0794 -- apex` to restore) | Superseded | Cheetah survives a 5-day season: stalk, sprint, pounce. Traits each night. |
-| APEX v2: lion | `apex/` (current) | First playable. Not yet played by a human. | Young lion: hunt to grow strong, win a pride on day 4, hold it through the last dusk. |
+| APEX v2: lion | `apex/` at commit `4149fac` | Played once: "needs a lot of work". Only the hold-to-grip takedown was fun | Young lion: hunt to grow strong, win a pride, hold it through the last dusk. |
+| APEX v3: lion + grapple | `apex/` (current) | Built in session 2. Not yet played by a human | v2 rebuilt around the part that was fun: a grapple minigame for every kill and lion fight, prey as difficulty tiers, real danger, scarcity, a hyena clan. |
 
 Feedback on v1: the stamina bar never fully emptied and didn't seem necessary given the cooldown, and the game didn't clearly fit a roguelike. That led to the lion pivot.
+
+Feedback on v2: repetitive and simple. You could chase down and pounce-spam anything, food was plentiful, there was no danger from animals, hyenas did nothing, and prey snagged on rocks. The one fun part was learning the hold-A takedown. That led to v3. Details are in `apex/PLAYTEST.md`.
+
+**Lesson so far:** the fun shows up where there's a skill to learn under pressure (the grapple), not in systems that run themselves. Build depth into the moment-to-moment verbs before adding more systems.
 
 ## Decision log
 
@@ -35,6 +40,12 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | **v3: every kill and lion fight is a grapple minigame**: hold pounce and push the stick with each telegraphed lurch, with a slow-mo zoom on the grab | Developer liked the idea ("a possible winner"), building on the one fun part of v2 |
+| 2026-10-22 | Rival clinches use the grapple, but differently: a balance tug-of-war; yellow = push with it, red = push away | Developer: "should be a little different than prey" |
+| 2026-10-22 | Species are difficulty tiers (warthog < zebra < wildebeest < buffalo), with a risk label | Developer: a day-1 wildebeest should be risky, a zebra a doable challenge, and by the end doable with the pride |
+| 2026-10-22 | Cut a day: 2 nomad days, then challenge, then pride (4 days, 150 s each) | Developer |
+| 2026-10-22 | Pounces come from a reserve of 2 (recharging), and a miss sprawls you | Fixes pounce spam. Making pounce cost charge was rejected, because a full burst would leave nothing to pounce with |
+| 2026-10-22 | Scarcity (faster hunger, wary herds), gorging into strength, a roaming hyena clan, obstacle avoidance | v2 feedback |
 | 2026-10-22 | Notes, playtest log and `tools/get_godot.sh` added | So each session starts where the last one stopped |
 | 2026-10-22 | Controller support for every action | Developer asked |
 | 2026-10-22 | Default tuning is **hard** (a weaker lion loses the challenge ~80% of the time) | Brother likes hard games |
