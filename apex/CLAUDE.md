@@ -41,11 +41,15 @@ Groups: `player`, `hunter` (things prey fear: player + lionesses), `enemy` (thin
 
 ## How to verify changes
 
-Always run these after a change. Godot must be on PATH as `godot` (or use the full path).
+**One command:** from the repo root, `tools/run_tests.sh apex` runs the import plus the smoke, input and soak tests. It takes about 3 minutes and prints `RESULT: PASS` or `FAIL`. Add `--probes` to run the tuning probes too; they save their results to `tests/results/*.txt`. Commit those, so `git log -p apex/tests/results/` shows how balance moved. GitHub runs the same checks on every push (`.github/workflows/tests.yml`).
+
+Individual scripts (Godot must be on PATH as `godot`):
 
 ```bash
 godot --headless --path . --import                                # after adding scripts or class_names
 godot --headless --path . --fixed-fps 60 -s tests/smoke_test.gd  # a whole life with shortcuts; must print SMOKE TEST: PASS
+godot --headless --path . -s tests/input_test.gd                  # every action on keyboard AND controller; INPUT TEST: PASS
+godot --headless --path . --fixed-fps 60 -s tests/soak_test.gd    # bot plays 2 min of a pride day; catches stuck/escaped animals, idle AI
 godot --headless --path . --fixed-fps 60 -s tests/hunt_sim.gd     # tuning probe: chases per species and distance
 godot --headless --path . --fixed-fps 60 -s tests/grapple_sim.gd  # tuning probe: grapples by species, strength, helpers
 godot --headless --path . --fixed-fps 60 -s tests/fight_sim.gd    # tuning probe: fight win rates by strength match-up
@@ -53,6 +57,10 @@ godot --path . --fixed-fps 30 -s tests/screenshot.gd              # renders scre
 ```
 
 - Look at the screenshots after any visual change.
+- Probe results are only as good as the bot: when a number jumps, check that the probe setup didn't change (e.g. v3's wider rim zone made zebras fleeing from the probe's start point turn early and get caught).
+- The fight probe swings ±20–30% between runs at 10 fights per matchup. Before a balance decision, set `RUNS := 20` (about 5 minutes).
+- The soak test is random (the world is). If it fails once, run it again and read its "worst stuck" / death lines before changing code.
+- Throwaway debug scripts go in `tests/_*.gd` and get deleted. If one finds a real bug, turn it into a check in an existing test.
 - Watch for `SCRIPT ERROR` and `Parse Error` in output; a clean run prints none.
 - In `-s` test scripts, autoloads are not compile-time globals: use `root.get_node("GameState")` and avoid static types from `class_name` scripts.
 - Probes must hold `GameState.day_time` below `DAY_LENGTH` and reset the phase between runs, or night falls / game over disables controls mid-probe.

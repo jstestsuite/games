@@ -40,6 +40,8 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | At most 2 hyenas wind up or dart at once; the clan grows by 0.5 per day, not 1 | The soak test showed 7 hyenas biting together killed a strong lion in ~25 s: unreadable, not hard-but-fair |
+| 2026-10-22 | Test kit: soak test, input test, saved probe results, `tools/run_tests.sh`, GitHub check on push | Developer: "anything useful for future development" |
 | 2026-10-22 | **v3: every kill and lion fight is a grapple minigame**: hold pounce and push the stick with each telegraphed lurch, with a slow-mo zoom on the grab | Developer liked the idea ("a possible winner"), building on the one fun part of v2 |
 | 2026-10-22 | Rival clinches use the grapple, but differently: a balance tug-of-war; yellow = push with it, red = push away | Developer: "should be a little different than prey" |
 | 2026-10-22 | Species are difficulty tiers (warthog < zebra < wildebeest < buffalo), with a risk label | Developer: a day-1 wildebeest should be risky, a zebra a doable challenge, and by the end doable with the pride |
@@ -114,6 +116,8 @@ These came from the first brainstorm and haven't been built.
 ## Notes for Claude sessions
 
 - **Install Godot first:** run `tools/get_godot.sh`. A fresh cloud container doesn't have it.
+- **Run every check:** `tools/run_tests.sh <draft>` (add `--probes` for the balance probes, `--shots` for screenshots). GitHub runs the checks on every push.
+- **Probe results are committed** in `<draft>/tests/results/`. Each file is stamped with the date, commit and any tuning overrides. `git log -p` on that folder is the balance history.
 - **Screenshots without a display:** use `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --fixed-fps 30 -s tests/screenshot.gd`.
   - It's slow: about 1 minute per shot with software rendering, so give it a 10-minute timeout.
   - Errors about `VK_KHR_surface` and "Screen space AA ... Compatibility renderer" are expected there and harmless.

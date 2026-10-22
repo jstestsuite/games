@@ -1,0 +1,13 @@
+# grapple_sim
+date:   2026-10-22 19:23:53
+commit: d39c495
+tuning: defaults from tuning.gd
+
+warthog  day 1 -> won 12/12  avg  4.1s  health lost   1%  injured  0  died 0
+zebra    day 1 -> won 11/12  avg  7.7s  health lost  20%  injured  0  died 0
+zebra    day 2 -> won 12/12  avg  6.9s  health lost  11%  injured  0  died 0
+wildeb.  day 1 -> won  6/12  avg  9.3s  health lost  45%  injured  1  died 0
+wildeb.  day 2 -> won 10/12  avg  8.3s  health lost  26%  injured  1  died 0
+wildeb.  pride -> won 12/12  avg  4.8s  health lost   3%  injured  0  died 0
+buffalo  solo  -> won  3/12  avg 11.7s  health lost  85%  injured  8  died 0
+buffalo  pride -> won 12/12  avg  4.6s  health lost  11%  injured  0  died 0

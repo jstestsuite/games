@@ -61,6 +61,7 @@ Causes found in the code afterwards:
 - Kicks happen but are tiny: zebra 10 damage, about one per takedown, and health regenerates.
 - Eating a zebra takes about 8 s; hyenas arrive after 14 s.
 - No obstacle avoidance: animals steer straight into rocks and trees (which do have colliders) and scrape along them, which is likely the circling.
+- Follow-up (v3, found by the new soak test): the circling was mostly in **map corners**. "Flee from the lion" and "stay off the rim" cancelled out, and the animal re-picked which way to slide along the rim every frame, so it dithered in place for up to 50 s. Fixed by committing to a side until clear and starting the edge zone earlier. The soak test now fails if any fleeing animal goes nowhere for 3 s.
 
 ### 2026-10-22 · developer · cheetah v1 (`504b85c`)
 - Sprint never fully used the stamina bar, and it didn't seem necessary given the cooldown. Suggested either a constantly draining sprint or relying on the cooldown alone.
