@@ -182,7 +182,7 @@ const SAVE_PATH := "user://tuning.cfg"
 # --- Hyenas ----------------------------------------------------------------
 @export_group("Hyenas")
 @export_range(0, 8, 1) var HYENA_ROAMERS := 2              ## a clan that shadows you from the start of each day
-@export_range(0, 3, 0.5) var HYENA_ROAMERS_PER_DAY := 1.0  ## extra roamers per day number
+@export_range(0, 3, 0.5) var HYENA_ROAMERS_PER_DAY := 0.5  ## extra roamers per day number
 @export_range(5, 80, 1) var HYENA_SHADOW_DIST := 35.0      ## roamers keep about this far from you
 @export_range(10, 200, 5) var HYENA_NOTICE_RANGE := 90.0   ## roamers come to any kill this close
 @export_range(0, 1, 0.05) var HYENA_CHANCE := 0.7          ## chance more hyenas join at a carcass
@@ -194,6 +194,7 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(0, 40, 0.5) var HYENA_BITE_DAMAGE := 8.0
 @export_range(0.05, 2, 0.05) var HYENA_DART_TELL := 0.35
 @export_range(0.5, 15, 0.5) var HYENA_DART_INTERVAL := 2.5 ## average seconds between darts per hyena
+@export_range(1, 8, 1) var HYENA_MAX_ATTACKERS := 2        ## at most this many winding up or darting at once (keeps bites readable)
 @export_range(2, 20, 0.5) var HYENA_GUARD_RADIUS := 8.0    ## they won't feed while a lion is this close to the carcass
 @export_range(0.5, 20, 0.5) var HYENA_EAT_RATE := 4.0      ## food per second each
 @export_range(0.5, 15, 0.5) var HYENA_SCATTER_TIME := 4.0

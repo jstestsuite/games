@@ -48,6 +48,7 @@ var _defend_rolled := false
 var _carcass_t := 0.0
 var _lurch := Vector3.ZERO
 var _stuck_t := 0.0
+var _edge_side := 0.0              # which way we slide along the rim; kept until we're clear
 var _risk_t := 0.0
 var _floor_normal := Vector3.UP
 var _rng := RandomNumberGenerator.new()
@@ -262,7 +263,10 @@ func _unstick(delta: float) -> void:
 		_stuck_t += delta
 		if _stuck_t > 0.35:
 			_stuck_t = 0.0
-			heading += (PI * 0.5) * (1.0 if _rng.randf() > 0.5 else -1.0)
+			# Turn a quarter toward the middle of the map, not into another wall.
+			var to_mid := -Vector3(global_position.x, 0, global_position.z)
+			var side := 1.0 if Vector3(-sin(heading), 0, -cos(heading)).cross(Vector3.UP).dot(to_mid) < 0.0 else -1.0
+			heading += (PI * 0.5) * side
 			_jink = 0.0
 	else:
 		_stuck_t = 0.0
@@ -366,7 +370,7 @@ func _flee(delta: float) -> void:
 		d = away.length()
 		away = away.normalized()
 
-	var dir := (away + _edge_push() * 2.5).normalized()
+	var dir := _flee_dir(away)
 
 	_jink_t -= delta
 	if _jink_t <= 0.0:
@@ -374,7 +378,9 @@ func _flee(delta: float) -> void:
 		# Jink harder when the hunter is close.
 		var close := clampf(1.0 - d / 25.0, 0.2, 1.0)
 		_jink = (1.0 if _rng.randf() > 0.5 else -1.0) * p("JINK") * close
-	_steer(dir.rotated(Vector3.UP, _jink), 9.0, delta)
+	# No jinking while sliding along the rim: it only fights the escape.
+	var jink := _jink if _edge_side == 0.0 else 0.0
+	_steer(dir.rotated(Vector3.UP, jink), 9.0, delta)
 
 	var top := p("SPEED") * (Tuning.PREY_WEAK_SPEED_MULT if weak else 1.0)
 	if _flee_t > Tuning.TIRE_TIME:
@@ -388,8 +394,26 @@ func _flee(delta: float) -> void:
 			herd.center = global_position
 
 
+## Away from the hunter, but never into the rim. Near the edge (worst in a corner,
+## where "away" and "off the rim" cancel out) run along it, toward the open side.
+func _flee_dir(away: Vector3) -> Vector3:
+	var push := _edge_push()
+	var w := clampf(push.length(), 0.0, 1.0)
+	if w < 0.01:
+		_edge_side = 0.0
+		return away
+	var along := away.cross(Vector3.UP)
+	# Pick a side once and keep it: re-deciding every frame made animals dither in
+	# corners, where both sides look equally good (the "running in circles" bug).
+	if _edge_side == 0.0:
+		var d := along.dot(push)
+		_edge_side = signf(d) if absf(d) > 0.05 else (1.0 if _rng.randf() > 0.5 else -1.0)
+	along *= _edge_side
+	return (away * (1.0 - w) + along * w * 1.5 + push * 1.5).normalized()
+
+
 func _edge_push() -> Vector3:
-	var half := Tuning.WORLD_SIZE * 0.5 - 30.0
+	var half := Tuning.WORLD_SIZE * 0.5 - 50.0
 	var pos := global_position
 	return Vector3(
 		-clampf((absf(pos.x) - half) / 12.0, 0.0, 1.0) * signf(pos.x), 0,

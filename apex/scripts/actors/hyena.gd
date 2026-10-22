@@ -121,7 +121,10 @@ func _physics_process(delta: float) -> void:
 					bravery += 0.5
 				_dart_timer -= delta * bravery
 				if _dart_timer <= 0.0 and _flat(player.global_position) < r + 6.0:
-					_go(HState.TELL)
+					if _attackers() < Tuning.HYENA_MAX_ATTACKERS:
+						_go(HState.TELL)
+					else:
+						_dart_timer = 0.4   # wait for a gap in the mob
 		HState.TELL:
 			speed = move_toward(speed, 0.0, 20.0 * delta)
 			_face(player.global_position, 8.0, delta)
@@ -171,6 +174,16 @@ func _physics_process(delta: float) -> void:
 	if is_on_floor():
 		_floor_normal = _floor_normal.lerp(get_floor_normal(), 1.0 - exp(-8.0 * delta)).normalized()
 	_update_look(delta)
+
+
+## How many of the clan are winding up or darting right now.
+func _attackers() -> int:
+	var n := 0
+	for h in get_tree().get_nodes_in_group("hyena"):
+		var hy := h as Hyena
+		if hy and (hy.hstate == HState.TELL or hy.hstate == HState.DART):
+			n += 1
+	return n
 
 
 ## A lion near the carcass keeps hyenas off it. Lionesses count too.
