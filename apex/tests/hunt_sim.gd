@@ -57,8 +57,8 @@ func _physics_process(delta: float) -> bool:
 			p._start_pounce()
 	if _t >= sc[3] or _g.is_dead:
 		var states := ["GRAZE", "ALERT", "FLEE", "DEAD"]
-		_log.append("%-16s -> %-5s awareness=%.2f  min_dist=%.1f  kills=%d" % [
-			sc[0], states[_g.state], _g.awareness, _min_d, GS.kills])
+		_log.append("%-16s -> %-5s awareness=%.2f  min_dist=%.1f  kills=%d  stamina_used=%.1f" % [
+			sc[0], states[_g.state], _g.awareness, _min_d, GS.kills, TU.STAMINA_MAX - p.stamina])
 		_scenario += 1
 		if _scenario >= scenarios.size():
 			for l in _log:

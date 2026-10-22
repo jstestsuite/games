@@ -15,7 +15,7 @@ A predator roguelite prototype. You're a cheetah. Survive five days on the savan
 | WASD | Move (you steer a heading; you don't strafe) |
 | Mouse | Camera |
 | Ctrl (or C) | Stalk: slow, low, quiet |
-| Shift | Sprint: very fast, about 4.5 s of stamina |
+| Shift | Sprint: very fast, spends a day-long stamina budget (about 14 s) |
 | Space / Left click | Pounce |
 | Esc | Pause |
 | 1 / 2 / 3 | Pick a trait at night |

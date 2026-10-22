@@ -138,7 +138,7 @@ func show_title() -> void:
 	var help := _label(19)
 	help.text = "WASD move   ·   Mouse look   ·   Ctrl stalk   ·   Shift sprint   ·   Space / Click pounce\n" \
 		+ "Gazelles see movement and smell you downwind. Use tall grass. Strike when their heads are down.\n" \
-		+ "Sprint is short. Get close first."
+		+ "Stamina lasts the whole day. Every sprint spends it: get close first."
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.modulate = Color(1, 1, 1, 0.85)
 	overlay_box.add_child(help)

@@ -132,10 +132,9 @@ func _move(delta: float) -> void:
 			exhausted = true
 			sprinting = false
 			GameState.message.emit("Out of breath!")
-	else:
-		var regen := Tuning.STAMINA_REGEN * GameState.mod("stamina_regen")
-		if speed < Tuning.WALK_SPEED * 0.5:
-			regen *= 1.6
+	elif speed < 0.5:
+		# Stamina is a day-long budget: only resting in place wins a little back.
+		var regen := Tuning.STAMINA_REST_REGEN * GameState.mod("stamina_regen")
 		stamina = minf(max_stamina, stamina + regen * delta)
 
 	var target_speed := 0.0
@@ -246,6 +245,8 @@ func _eat(delta: float) -> void:
 			heading = lerp_angle(heading, atan2(-to.x, -to.z), 1.0 - exp(-6.0 * delta))
 	if _eat_t <= 0.0:
 		state = State.MOVE
+		var max_stamina := Tuning.STAMINA_MAX * GameState.mod("stamina")
+		stamina = minf(max_stamina, stamina + Tuning.STAMINA_EAT_RESTORE * GameState.mod("stamina_regen"))
 		_pounce_cd = 0.3
 
 

@@ -33,8 +33,9 @@ const ACCEL_WALK := 18.0
 const ACCEL_SPRINT := 14.0           # build-up to top speed
 const TURN_RATE_WALK := 10.0         # radians/sec
 const TURN_RATE_SPRINT := 2.6        # lower = wider turns at speed (prey jinks matter)
-const STAMINA_MAX := 4.5             # seconds of sprint
-const STAMINA_REGEN := 0.55          # per second while not sprinting
+const STAMINA_MAX := 14.0            # seconds of sprint for the whole day; refills at night
+const STAMINA_REST_REGEN := 0.15     # per second, only while standing still (lying in wait)
+const STAMINA_EAT_RESTORE := 6.0     # regained from finishing a kill
 const STAMINA_MIN_TO_SPRINT := 1.0   # once exhausted, need this much to sprint again
 
 # --- Pounce -------------------------------------------------------------

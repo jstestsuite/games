@@ -23,7 +23,7 @@ const TRAITS := {
 	"iron_gut":     {"name": "Iron Gut",      "desc": "Hunger drains 25% slower.",              "mods": {"hunger_drain": 0.75}},
 	"burst":        {"name": "Burst",         "desc": "+8% top sprint speed.",                  "mods": {"sprint_speed": 1.08}},
 	"tight_turns":  {"name": "Tight Turns",   "desc": "Turn 40% sharper while sprinting.",      "mods": {"sprint_turn": 1.4}},
-	"second_wind":  {"name": "Second Wind",   "desc": "Stamina recovers 50% faster.",           "mods": {"stamina_regen": 1.5}},
+	"second_wind":  {"name": "Second Wind",   "desc": "Rest and kills restore 50% more stamina.", "mods": {"stamina_regen": 1.5}},
 	"downwind":     {"name": "Downwind",      "desc": "Your scent carries half as strongly.",   "mods": {"scent": 0.5}},
 	"big_stomach":  {"name": "Big Stomach",   "desc": "Each kill feeds you 30% more.",          "mods": {"food": 1.3}},
 }

@@ -21,7 +21,7 @@ Target feeling: **tense patience, then an explosive release.** Thirty seconds of
 - **Stalk:** crouch (Ctrl) to move slowly and quietly. Tall grass hides you. Gazelles alternate heads-down grazing (half vision) and heads-up scanning.
 - **Scent:** if the wind carries from you to them, they notice you no matter how still you are. Approach from downwind.
 - **Awareness:** each gazelle has a meter. `?` = suspicious or alert, `!` = fleeing. Fleeing spreads panic to nearby animals.
-- **Chase:** sprint (Shift) is about 4.5 s of stamina. You're faster in a straight line (31 vs 24 m/s), but you turn wide at speed and gazelles jink.
+- **Chase:** sprint (Shift) spends a day-long stamina budget (about 14 s; refills at night, +6 s per kill, a trickle while standing still). You're faster in a straight line (31 vs 24 m/s), but you turn wide at speed and gazelles jink.
 - **Pounce** (Space/LMB): a short lunge with slight homing. Hit = kill, feed, brief hit-stop. Miss = lost momentum.
 - **Night:** the night costs hunger. Pick 1 of 3 traits. Next day, new wind, new herds.
 - **Lose:** hunger hits 0. **Win:** survive 5 days.
