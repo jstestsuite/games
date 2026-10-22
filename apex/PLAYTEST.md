@@ -32,6 +32,25 @@ These are the open risks. Each one is a guess until someone plays.
 
 ## Entries
 
+### 2026-10-22 · developer · lion v2 (`daaa9fb`), controller
+Verdict: "needs a lot of work, wouldn't call it super fun." Learning the hold-A takedown was fun the first couple of times. After that it was repetitive and simple.
+- Prey sometimes get stuck running in circles.
+- You can chase down anything.
+- More food than you can eat.
+- You can just pounce on the opposing lion; spamming pounce kills lions.
+- A `?` hangs over dead prey. It looks intentional, but should probably be a different marker.
+- Expected danger from the animals (getting kicked, etc.); didn't feel any.
+- Hyenas did nothing: easy to kill, and the meal was finished before they arrived.
+- Prey and lionesses collide badly with rocks.
+
+Causes found in the code afterwards:
+- The `?` bug: the takedown calls `die()` mid-frame, then the same frame's visual update re-shows the awareness marker.
+- Pounce stun-locks rivals: the cooldown (0.9 s) barely outlasts the stagger (0.6 s), so he never finishes a windup. The fight bot only swiped, so it never found this.
+- Pounce is as fast as running, with no hunger cost and no winding.
+- Kicks happen but are tiny: zebra 10 damage, about one per takedown, and health regenerates.
+- Eating a zebra takes about 8 s; hyenas arrive after 14 s.
+- No obstacle avoidance: animals steer straight into rocks and trees (which do have colliders) and scrape along them, which is likely the circling.
+
 ### 2026-10-22 · developer · cheetah v1 (`504b85c`)
 - Sprint never fully used the stamina bar, and it didn't seem necessary given the cooldown. Suggested either a constantly draining sprint or relying on the cooldown alone.
 - Unsure this style fits a roguelike. Suggested a lion whose goal is to become head of the pride.
