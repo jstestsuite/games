@@ -1,6 +1,6 @@
 # CLAUDE.md: Working on APEX
 
-Read `DESIGN.md` first for what the game is and where it's headed.
+Read `DESIGN.md` first for what the game is and where it's headed (its Status section lists known gaps), and `PLAYTEST.md` for what the developer has reported. The repo-level `../NOTES.md` has the overall goal and decision log. No Godot in the container? Run `../tools/get_godot.sh`.
 
 ## Project facts
 

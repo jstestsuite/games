@@ -88,6 +88,32 @@ Tuning reference (`tests/fight_sim.gd`, a bot with human reaction time that dodg
 - "Copy changes" puts only the values you changed on the clipboard, ready to paste to Claude.
 - `tests/hunt_sim.gd` and `tests/fight_sim.gd` report how hunts and fights play out after a change.
 
+## Status (end of session 1, 2026-10-22)
+
+**Verified by tests:**
+- the whole loop runs start to finish (smoke test: kill, eat, hyenas, nights, challenge, pride, challengers, victory);
+- the hunt and fight probe numbers above;
+- controller bindings reach the right actions (simulated input).
+
+**Not yet verified, because no human has played it:**
+- whether any of it is fun;
+- run length in real play;
+- how the controller feels on a real pad;
+- whether the `!` / `!!` warnings are readable at full speed.
+
+**Known gaps and rough edges:**
+- No audio. Primitive placeholder art. Young/old prey differ only by size.
+- No lock-on in fights; the camera is free, so tracking a circling rival may be awkward. Lions pass through each other.
+- AI ignores trees and rocks (no navmesh); things can walk through boulders at the den.
+- All lionesses chase the same animal; there's no real coordinated ambush. They also eat your kills alongside you.
+- Cubs are decoration.
+- The F1 panel needs a mouse.
+- A single valley; the den is placed at random.
+- Any death ends the run, including a lost nomad fight (you can run away from those).
+- The balance numbers come from bots, not people. Expect the first playtest to move them.
+
+See `PLAYTEST.md` for what to watch for in the first playtest.
+
 ## Next milestones (suggested order)
 
 1. **Playtest and tune the full loop.** Is the challenge a wall or a speed bump? Do hyenas feel like pressure or a nuisance? Does the pride help enough?

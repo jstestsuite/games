@@ -1,0 +1,111 @@
+# Project notes
+
+Shared memory between sessions: what we're trying to make, what we've decided and why, and how we'll pick between drafts. Update it at the end of every session. Each draft's own `DESIGN.md` covers that game in detail.
+
+## The goal
+
+**Make a game the developer's brother considers fun and worth playing.**
+
+- **He likes hard games.** That's the main thing we know about his taste so far. Still worth finding out: which games he plays and loves, whether he plays on keyboard or controller, and solo or co-op.
+- **Approach:** build a few rough, playable drafts, playtest them, then narrow down to one and polish it. Drafts should be cheap. Prove the core 30-second loop is fun before building anything on top of it.
+- **Roles:** the developer playtests and sets direction. Claude implements, tunes with automated probes, and says after each change what to try in game.
+
+## What "fun for him" probably means
+
+This is our working guess. Confirm or correct it after he plays.
+
+- **Hard but fair.** Every loss should trace back to a cue he could have read. Cheap deaths kill hard games.
+- **Short runs, one more go.** About 15 minutes per run (the developer's target).
+- **Skill expression.** Run 5 should look visibly better than run 1.
+- **Runs that differ.** Choices in a run (traits, targets, risks) should change how it plays.
+- **Stories.** Moments he'd want to tell someone about ("my lionesses and I took down a buffalo").
+
+## Draft index
+
+| Draft | Where | Status | Pitch |
+|---|---|---|---|
+| APEX v1: cheetah | `apex/` at commit `aac0794` (`git checkout aac0794 -- apex` to restore) | Superseded | Cheetah survives a 5-day season: stalk, sprint, pounce. Traits each night. |
+| APEX v2: lion | `apex/` (current) | First playable. Not yet played by a human. | Young lion: hunt to grow strong, win a pride on day 4, hold it through the last dusk. |
+
+Feedback on v1: the stamina bar never fully emptied and didn't seem necessary given the cooldown, and the game didn't clearly fit a roguelike. That led to the lion pivot.
+
+## Decision log
+
+Newest first. Say who decided, so later sessions know what's settled and what's open.
+
+| Date | Decision | Who / why |
+|---|---|---|
+| 2026-10-22 | Notes, playtest log and `tools/get_godot.sh` added | So each session starts where the last one stopped |
+| 2026-10-22 | Controller support for every action | Developer asked |
+| 2026-10-22 | Default tuning is **hard** (a weaker lion loses the challenge ~80% of the time) | Brother likes hard games |
+| 2026-10-22 | Every gameplay number is tunable in game (F1 panel) | Developer wants to try many difficulty changes themselves |
+| 2026-10-22 | Run length about 15 minutes or less | Developer |
+| 2026-10-22 | Losing the challenge fight ends the run "for now". The alternative was going back to nomad life | Developer. Revisit after playtests |
+| 2026-10-22 | Sprint = short burst, then a slower sustained run. The stamina bar is removed | Developer's call. Claude suggested "top speed fades" |
+| 2026-10-22 | Pivot from cheetah to lion: become head of the pride. Three acts: nomad, challenge, pride | Developer's idea. It gives the run a goal and a boss fight |
+| 2026-10-22 | (v1) Stamina became a day-long budget | Tried after the v1 feedback; dropped in the pivot |
+
+## How we'll compare drafts
+
+After each playtest, score the draft from 1 to 5 on each question:
+
+| Question | What to look for |
+|---|---|
+| **Hook** | Did he understand what to do in the first 2 minutes without help? |
+| **One more run** | Did he restart without being asked? |
+| **Fair deaths** | When he lost, could he say why? |
+| **Mastery** | Did he get visibly better across runs? |
+| **Moments** | Did he react out loud (laugh, swear, cheer)? |
+| **Variety** | Did run 3 feel different from run 1? |
+| **Build cost** | How much work would it take to make this good? (Our side, not his.) |
+
+The draft that wins on hook, one more run and fair deaths is the one to polish. Art and audio can come later.
+
+## Playtest protocol
+
+1. **Don't coach the first run.** Note where he gets stuck or confused; that's a readability bug.
+2. **Write down:**
+   - time to his first kill or success;
+   - each death and its cause;
+   - when he reacted out loud;
+   - what he asked.
+3. **Afterwards, ask:**
+   - What was the best moment?
+   - What was the most annoying moment?
+   - Would you play again? What would make you?
+4. **If you changed numbers in the F1 panel,** press "Copy changes" and paste the result into the next session. Claude will make them the new defaults.
+5. **Log it** in the draft's `PLAYTEST.md` and paste or summarise it at the start of the next session.
+
+## Ideas for other drafts
+
+These came from the first brainstorm and haven't been built.
+
+- **Cheetah with a territory map.** Restore v1 and add a branching map (plains, riverbank, hyena country, drought valley), plus traits that change rules rather than stats. Cheap, because v1 exists.
+- **Life cycle.** Cub, then adult, then old. You win by raising a litter, and a surviving cub passes a trait to the next run.
+- **Coalition brothers co-op.** Two male lions, one per player. Real male lion coalitions are often brothers, which fits the audience. Online play is a big build; local split screen (two SubViewports) is cheaper.
+- **Other predators** as separate drafts or as unlocks:
+  - leopard: stealth, trees, stashing kills;
+  - wolf: weak alone, recruits a pack;
+  - crocodile: ambush at the water.
+
+## Starting a new draft
+
+- **Folder:** a new folder at the repo root (`<name>/`) with its own `project.godot`, `CLAUDE.md`, `DESIGN.md`, `README.md` and `PLAYTEST.md`.
+- **Reuse from `apex/`, since these patterns already work:**
+  - `scripts/autoload/tuning.gd`: exported vars, plus save/load of overrides;
+  - `scripts/ui/tuning_panel.gd`: the F1 panel, built automatically from those vars;
+  - input set up in code with keyboard **and** controller bindings (`game_state.gd`);
+  - `tests/smoke_test.gd`, plus probe bots like `hunt_sim.gd` and `fight_sim.gd` for tuning without a human;
+  - `world/terrain.gd` and `actors/animal_rig.gd` for savanna and animal drafts.
+- **Make the core loop fun first.** Only then add meta layers.
+- **Add the draft** to the index above and to the root `README.md`.
+
+## Notes for Claude sessions
+
+- **Install Godot first:** run `tools/get_godot.sh`. A fresh cloud container doesn't have it.
+- **Screenshots without a display:** use `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --fixed-fps 30 -s tests/screenshot.gd`.
+  - It's slow: about 1 minute per shot with software rendering, so give it a 10-minute timeout.
+  - Errors about `VK_KHR_surface` and "Screen space AA ... Compatibility renderer" are expected there and harmless.
+- **Probe bots lie** if state leaks between runs (night falling, game over disabling controls, sprint state carrying over). Reset everything per run, and sanity-check surprising results by running one scenario alone.
+- **Probe bots aren't humans.** The fight bot uses a 0.28 s reaction time and dodges 70% of warnings, roughly a decent player. Treat its win rates as relative, not absolute.
+- **Work happens on `claude/*` branches.** No pull request has been opened yet; ask before opening one.
