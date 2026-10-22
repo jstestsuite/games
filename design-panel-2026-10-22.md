@@ -131,3 +131,68 @@ All four of you want to:
 3. **What the stick does:** match the animal's heading (A), stay over its spine / shift weight (D), or follow its pattern (C)? And what does the right trigger do: clamp (narrows tolerance), dig claws (spends a grip pool), or a stamina cost? Is there a release button (B)?
 4. **The rival fight:** a pure mirrored ride (A, D), or a ride plus authored swipe, lunge and roar moves (B)?
 5. **The lion:** a real fantasy worth keeping, or a skin (C)?
+
+---
+
+# Session 2: with the brother's taste and Justin's direction
+
+## New inputs
+- **Justin won't ask the brother anything.** The plan is to show up with a game that wows him, so Justin is the only playtester.
+- **The brother's Steam library:**
+  - played recently: Diceomancer and Drop Duchy;
+  - most hours: Dead Cells, Mewgenics, Satisfactory and Caves of Qud.
+- **Justin's direction:**
+  - The prey ride goes in, as described in session 1.
+  - Add a **level select** (a test room and so on), so every feature can be tested on its own as well as in the whole game.
+  - Runs are **self-contained, with no roguelike traits**. Random stats per run might come later. For now, focus on a solid loop.
+- **Panel:** Justin asked the main session to join as **seat E, the implementer**, an input with the most context. The four panelists made the final decisions.
+
+## What the library says (all four checked the games on the web)
+- **Build-craft and systems.** Five of the six games are about understanding a system well enough to break it. Dead Cells is the only action game, and even it runs on builds.
+- **Ride versus decisions.** A great ride may wow him once, but the decisions between rides are what will bring him back. Judge every build on both.
+
+## Final decisions (unanimous unless noted)
+1. **Run shape: a node map.** In round 4 it was tied 2–2; the final vote was 4–0, with B and D changing their votes after seat E's input.
+   - **The map:** a Slay the Spire / Drop Duchy style branching map of about 5–7 nodes. Each node is a small 3D hunt arena built from the existing terrain code, so there's no travel time and no self-running world systems.
+   - **The pride male:** his node is reachable from the start, so you challenge him whenever you think you're ready.
+   - **The dry season:** each node you take dries up its neighbours.
+   - **Injuries** last the whole run.
+   - **An elite:** a crocodile at a river crossing, whose death roll is a reverse ride.
+2. **Growth: your body, not a menu.**
+   - **Physics:** what you hunt changes your body as physics. Buffalo make you heavier (steadier, slower to charge). Zebra keep you light and quick.
+   - **Injuries:** they skew the clamp.
+   - **Scars:** they show on the body.
+   - **Readability:** it has to be **visible and readable**.
+   - **The rule for it:** no pick screen, ever. **Not built until the run spine works, and put to Justin as a question first.** Ship it as a toggle, off by default.
+3. **The boss:** the pride male as a mirrored ride, plus at most one authored move (his lunge).
+   - Practice is in the level select, which fixes "I only tried twice".
+   - No hyenas, no brawl.
+4. **Later:** a difficulty ladder you climb by winning (Hades-style heat, Dead Cells-style boss cells). There are no unlocks, so each run stays self-contained.
+5. **The level select:**
+   - Ride Room;
+   - Species Trials;
+   - Rival Ring;
+   - Hazards (one entry per hazard);
+   - Approach;
+   - Full Run;
+   - later, Full Run + growth (a toggle) and seeds.
+
+## Build order (each build proves one thing)
+1. **Ride Room + level select** (all four agree).
+   - A toggle for 3 control feels: match the heading, stay over the spine, and **mouse** (in case the brother plays on mouse and keyboard; most of his library is mouse-driven).
+   - Exaggerated body tells and a camera over the animal's shoulders.
+   - The perfect-follow bot test, and signed-lag logging.
+   - **Proves:** the ride is still fun at ride 20, on a pad and with a mouse.
+2. **Species Trials** (A, C, D; B wanted the spine here).
+   - **Proves:** the four animals read as four different bodies.
+3. **A thin run spine:** 3–5 arena nodes plus the male's node, with injuries carrying over. No growth yet.
+   - **Proves:** routing and "am I ready?" are real decisions using the verbs we already have.
+4. **Hazards, one at a time** (the buffalo mob, the croc), the rival's lunge, and then growth as a toggle, if Justin says yes.
+
+## Process
+- **Restate before building:** before any code, restate what the thumbs do in one sentence and get Justin to confirm it.
+- **No prompts:** reject anything that puts a prompt on screen between the player and the animal.
+- **One change per build:** a new feature gets its own level-select entry.
+- **A fresh run in reserve:** Justin will know the game too well. Keep one fresh full run in reserve (after a few days away), and freeze the scope two builds before the reveal.
+- **Taste check:** before tuning difficulty, an hour of Dead Cells or Mewgenics.
+- **A polish build before the reveal:** audio, juice, and a first 2 minutes that teach themselves.

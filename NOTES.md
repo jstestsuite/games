@@ -42,6 +42,8 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | **Proposed by the panel (session 2), awaiting Justin:**<br>- a node map of small hunt arenas<br>- the pride male reachable at any time<br>- growth by body, not a menu, held behind a toggle until Justin says yes<br>- the build order: Ride Room + level select, then Species Trials, then a thin run spine | Brother's library (Diceomancer, Drop Duchy, Dead Cells, Mewgenics, Satisfactory, Caves of Qud) says build-craft and decisions matter. See `design-panel-2026-10-22.md` |
+| 2026-10-22 | Each run is self-contained, with no roguelike traits. Level select with test rooms for each feature. Don't ask the brother anything: the plan is to wow him | Justin |
 | 2026-10-22 | Justin isn't committed to the lion idea. Scrapping it and starting over is fine if a better idea comes up | Justin, after the v3 playtest |
 | 2026-10-22 | **On hold:** no game changes until we agree on what's missing. A design panel proposed a greybox "ride" test room, cutting most of v3's systems, and asking the brother 5 questions first | Developer paused after the v3 playtest. The proposal is in `design-panel-2026-10-22.md`, not yet accepted |
 | 2026-10-22 | At most 2 hyenas wind up or dart at once; the clan grows by 0.5 per day, not 1 | The soak test showed 7 hyenas biting together killed a strong lion in ~25 s: unreadable, not hard-but-fair |
