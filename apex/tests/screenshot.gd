@@ -14,6 +14,8 @@ var shots := [
 	["rival_lunge_tell", 0.3, "rival"],
 	["pride_at_den", 0.7, "den"],
 	["hyenas_at_kill", 0.6, "hyenas"],
+	["grapple_zebra", 0.35, "grapple"],
+	["clinch", 0.4, "clinch"],
 ]
 var _shot := 0
 var _rival: Node
@@ -33,7 +35,18 @@ func _process(_d: float) -> bool:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if _f > 3 and (_f - 4) % 90 == 0 and _shot < shots.size():
 		_setup(shots[_shot])
-	if is_instance_valid(_rival):
+	var pl = _main.player if _main else null
+	if pl and pl.grapple != null:
+		# Freeze the struggle mid-warning so the arrow shows.
+		pl.grapple.phase = 1
+		pl.grapple.t = 0.35
+		pl.grapple.dir = Vector2(-1, 0)
+		pl.grapple.is_bite = pl.grapple.kind == 1
+		pl.grapple._tell_len = 0.5
+		pl.grapple.grip = 0.6
+		pl.grapple.progress = 0.45
+		pl.grapple.balance = 0.3
+	elif is_instance_valid(_rival):
 		# Hold the rival in his lunge windup so the tell shows.
 		_rival.move = 3
 		_rival._t = 0.5
@@ -83,6 +96,31 @@ func _setup(s: Array) -> void:
 			_main._spawn_pride_at_den()
 			var den: Vector3 = _main.den
 			_place_cam(p, den + Vector3(14, 0, 8), den, -0.2, 0.3)
+		"grapple":
+			_rival = null
+			if get_nodes_in_group("prey").is_empty():
+				_main._spawn_herds()
+			var z = null
+			for n in get_nodes_in_group("prey"):
+				if n.species == "ZEBRA":
+					z = n
+					break
+			p.global_position = z.global_position + Vector3(1.0, 0.4, 0)
+			z.grab(p)
+			p._start_takedown(z)
+			p._cam_yaw = p.heading
+			p.controls_enabled = false
+		"clinch":
+			if is_instance_valid(p.grab_target):
+				p.grab_target.release(p)
+			p._end_grapple()
+			p.state = 0
+			var at: Vector3 = p.global_position + Vector3(0, 0, -2)
+			_rival = _main._make_rival("Pride male", 1.6, at)
+			_rival.rstate = 3
+			p.controls_enabled = false
+			p.start_clinch(_rival, 0.2)
+			p._cam_yaw = p.heading
 		"hyenas":
 			if get_nodes_in_group("prey").is_empty():
 				_main._spawn_herds()

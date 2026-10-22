@@ -4,8 +4,9 @@ extends CharacterBody3D
 ## Tuning, looked up by species prefix (e.g. ZEBRA_SPEED).
 ## Senses every hunter (the player and lionesses) by sight and scent, builds an
 ## awareness meter: GRAZE -> ALERT -> FLEE. Buffalo may DEFEND (charge you) instead.
-## When grabbed it struggles and kicks until the takedown finishes, then it becomes a
-## carcass that lions and hyenas eat from.
+## When the player grabs it, the struggle is a Grapple run by the lion; this script just
+## thrashes, leans and lurches as told. Grabbed by lionesses alone, it's a simpler
+## contest of power. Dead, it becomes a carcass that lions and hyenas eat from.
 
 signal became_carcass(prey: Prey)
 
@@ -29,7 +30,8 @@ var food_total := 1.0
 var killed_by_pride := false
 var weak := false                  # young or old: smaller and slower
 var grabbers: Array[Node3D] = []
-var takedown := 0.0                # 0..1
+var takedown := 0.0                # 0..1, lionesses-only takedowns
+var lean := Vector3.ZERO           # set by the grappling lion: which way it's about to lurch
 
 var _grazing := true
 var _graze_timer := 0.0
@@ -44,12 +46,16 @@ var _defend_target: Node3D
 var _defend_t := 0.0
 var _defend_rolled := false
 var _carcass_t := 0.0
+var _lurch := Vector3.ZERO
+var _stuck_t := 0.0
+var _risk_t := 0.0
 var _floor_normal := Vector3.UP
 var _rng := RandomNumberGenerator.new()
 var _size := 1.0
 var _height := 1.5
 var rig: AnimalRig
 var marker: Label3D
+var risk_tag: Label3D
 
 
 ## Tuning value for this species, e.g. p("SPEED") -> Tuning.ZEBRA_SPEED.
@@ -94,6 +100,17 @@ func _ready() -> void:
 	marker.position.y = _height + 0.3
 	marker.visible = false
 	add_child(marker)
+
+	risk_tag = Label3D.new()
+	risk_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	risk_tag.no_depth_test = true
+	risk_tag.fixed_size = true
+	risk_tag.pixel_size = 0.0011
+	risk_tag.font_size = 36
+	risk_tag.outline_size = 10
+	risk_tag.position.y = _height - 0.1
+	risk_tag.visible = false
+	add_child(risk_tag)
 
 	heading = _rng.randf() * TAU
 	_graze_timer = _rng.randf_range(1.0, 5.0)
@@ -140,8 +157,9 @@ func _physics_process(delta: float) -> void:
 	_think(delta)
 
 	var fwd := Vector3(-sin(heading), 0, -cos(heading))
-	velocity.x = fwd.x * speed
-	velocity.z = fwd.z * speed
+	velocity.x = fwd.x * speed + _lurch.x
+	velocity.z = fwd.z * speed + _lurch.z
+	_lurch = _lurch.move_toward(Vector3.ZERO, 25.0 * delta)
 	if not is_on_floor():
 		velocity.y -= 30.0 * delta
 	else:
@@ -149,6 +167,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if is_on_floor():
 		_floor_normal = _floor_normal.lerp(get_floor_normal(), 1.0 - exp(-8.0 * delta)).normalized()
+	_unstick(delta)
+	if state == State.DEAD:
+		return   # died this frame (a takedown finished): the carcass takes it from here
 	_update_visuals(delta)
 
 
@@ -184,7 +205,7 @@ func _sense_one(h: Node3D) -> float:
 	var gain := 0.0
 	if d < Tuning.SIGHT_RANGE:
 		var closeness := 1.0 - d / Tuning.SIGHT_RANGE
-		var sight: float = h.get_posture() * closeness * p("VIGILANCE")
+		var sight: float = h.get_posture() * closeness * p("VIGILANCE") * (herd.vigilance() if herd else 1.0)
 		if in_cover:
 			sight *= Tuning.COVER_MULT
 		if _grazing and state == State.GRAZE:
@@ -222,6 +243,29 @@ func _nearest_hunter() -> Node3D:
 			best_d = d
 			best = h
 	return best
+
+
+## Turn toward `dir`, bent around rocks and trees.
+func _steer(dir: Vector3, rate: float, delta: float) -> void:
+	if terrain:
+		dir = terrain.avoid(global_position, dir, 3.0 + speed * 0.4)
+	heading = lerp_angle(heading, atan2(-dir.x, -dir.z), 1.0 - exp(-rate * delta))
+
+
+## Running but barely moving means we're scraping along something: turn hard.
+func _unstick(delta: float) -> void:
+	if state != State.FLEE and state != State.GRAZE:
+		_stuck_t = 0.0
+		return
+	var moved := Vector2(get_real_velocity().x, get_real_velocity().z).length()
+	if speed > 2.0 and moved < speed * 0.35:
+		_stuck_t += delta
+		if _stuck_t > 0.35:
+			_stuck_t = 0.0
+			heading += (PI * 0.5) * (1.0 if _rng.randf() > 0.5 else -1.0)
+			_jink = 0.0
+	else:
+		_stuck_t = 0.0
 
 
 # --- decisions ----------------------------------------------------------------
@@ -273,7 +317,7 @@ func _graze(delta: float) -> void:
 		_wander_pause = _rng.randf_range(2.0, 6.0)
 		_pick_wander()
 	else:
-		heading = lerp_angle(heading, atan2(-to.x, -to.z), 1.0 - exp(-2.0 * delta))
+		_steer(to.normalized(), 2.0, delta)
 		speed = move_toward(speed, Tuning.GRAZE_SPEED, 3.0 * delta)
 
 
@@ -293,6 +337,8 @@ func _alert_herd() -> void:
 
 
 func _start_flee() -> void:
+	if herd and state != State.FLEE:
+		herd.attacked()
 	state = State.FLEE
 	_flee_t = 0.0
 	_jink_t = _rng.randf_range(0.3, 0.6)
@@ -328,8 +374,7 @@ func _flee(delta: float) -> void:
 		# Jink harder when the hunter is close.
 		var close := clampf(1.0 - d / 25.0, 0.2, 1.0)
 		_jink = (1.0 if _rng.randf() > 0.5 else -1.0) * p("JINK") * close
-	var desired := atan2(-dir.x, -dir.z) + _jink
-	heading = lerp_angle(heading, desired, 1.0 - exp(-9.0 * delta))
+	_steer(dir.rotated(Vector3.UP, _jink), 9.0, delta)
 
 	var top := p("SPEED") * (Tuning.PREY_WEAK_SPEED_MULT if weak else 1.0)
 	if _flee_t > Tuning.TIRE_TIME:
@@ -414,42 +459,42 @@ func _struggle(delta: float) -> void:
 	if grabbers.is_empty():
 		release(null)
 		return
-	var power := 0.0
-	var player_on := false
-	var lionesses_on := 0
-	for g in grabbers:
-		if g.is_in_group("player"):
-			power += GameState.strength * GameState.mod("takedown")
-			player_on = true
-		else:
-			power += Tuning.LIONESS_TAKEDOWN_POWER
-			lionesses_on += 1
-	takedown += power / (Tuning.TAKEDOWN_TIME * p("TOUGHNESS")) * delta
 	speed = move_toward(speed, Tuning.TAKEDOWN_DRAG_SPEED, 20.0 * delta)
 	heading += sin(Time.get_ticks_msec() * 0.004 + get_instance_id()) * 1.5 * delta
+	for g in grabbers:
+		if g.is_in_group("player"):
+			return   # the lion's Grapple runs this fight
 
+	# Lionesses alone: a plain contest of power.
+	var power := grabbers.size() * Tuning.LIONESS_GRAB_POWER
+	takedown += power / maxf(0.05, p("POWER")) / Tuning.TAKEDOWN_TIME * delta
 	_kick_t -= delta
 	if _kick_t <= 0.0:
 		_kick_t = Tuning.KICK_INTERVAL
-		if _rng.randf() < Tuning.KICK_CHANCE:
-			if player_on:
-				for g in grabbers:
-					if g.is_in_group("player") and g.has_method("take_beast_hit"):
-						g.take_beast_hit(p("KICK"), global_position, false)
-			elif p("TOUGHNESS") > Tuning.LIONESS_TOUGHNESS_LIMIT * lionesses_on:
-				# Too big for the lionesses alone: it throws them off.
-				for g in grabbers.duplicate():
-					if g.has_method("thrown_off"):
-						g.thrown_off()
-				grabbers.clear()
-				release(null)
-				return
-
+		if _rng.randf() < Tuning.KICK_CHANCE and power < p("POWER") * Tuning.LIONESS_SOLO_NEED:
+			# Too strong for them: it throws them off.
+			for g in grabbers.duplicate():
+				if g.has_method("thrown_off"):
+					g.thrown_off()
+			grabbers.clear()
+			release(null)
+			return
 	if takedown >= 1.0:
-		killed_by_pride = not player_on
-		if killed_by_pride:
-			GameState.message.emit("Your lionesses brought down a %s." % display_name().to_lower())
+		killed_by_pride = true
+		GameState.message.emit("Your lionesses brought down a %s." % display_name().to_lower())
 		die()
+
+
+## A lurch during a grapple: a sudden yank in a world direction.
+func lurch(world_dir: Vector3) -> void:
+	_lurch = world_dir * Tuning.GRAB_LURCH_SPEED
+
+
+## Show how risky this animal is to grab (the lion calls this every frame it's targeted).
+func show_risk(text: String, col: Color) -> void:
+	risk_tag.text = text
+	risk_tag.modulate = col
+	_risk_t = 0.15
 
 
 func die() -> void:
@@ -458,9 +503,11 @@ func die() -> void:
 	speed = 0.0
 	velocity = Vector3.ZERO
 	grabbers.clear()
+	lean = Vector3.ZERO
 	remove_from_group("prey")
 	add_to_group("carcass")
 	marker.visible = false
+	risk_tag.visible = false
 	collision_layer = 0
 	food_total = p("FOOD") * (Tuning.PREY_WEAK_FOOD_MULT if weak else 1.0)
 	food_left = food_total
@@ -480,6 +527,12 @@ func take_food(amount: float) -> float:
 
 func _carcass_tick(delta: float) -> void:
 	_carcass_t += delta
+	# A meat marker shows what's left, when you're near enough to care.
+	var pl := get_tree().get_first_node_in_group("player") as Node3D
+	marker.visible = pl != null and pl.global_position.distance_to(global_position) < 40.0
+	marker.text = "MEAT %d" % int(ceil(food_left))
+	marker.modulate = Color(0.95, 0.55, 0.45)
+	marker.font_size = 30
 	var frac := clampf(food_left / maxf(food_total, 1.0), 0.0, 1.0)
 	rig.scale = Vector3.ONE * lerpf(0.55, 1.0, frac)
 	if food_left <= 0.0 or _carcass_t > Tuning.CARCASS_LIFETIME:
@@ -494,7 +547,13 @@ func _update_visuals(delta: float) -> void:
 	var fwd := Vector3(-sin(heading), 0, -cos(heading))
 	var right := fwd.cross(up).normalized()
 	fwd = up.cross(right).normalized()
-	rig.global_basis = Basis(right, up, -fwd).scaled(Vector3.ONE * _size)
+	var b := Basis(right, up, -fwd)
+	if lean.length() > 0.01:
+		# Tilt toward the coming lurch so you can see it as well as the arrow.
+		b = Basis(up.cross(lean.normalized()).normalized(), lean.length() * 0.35) * b
+	rig.global_basis = b.scaled(Vector3.ONE * _size)
+	_risk_t -= delta
+	risk_tag.visible = _risk_t > 0.0 and state != State.GRABBED
 	head_down = lerpf(head_down, 1.0 if (_grazing and state == State.GRAZE) else 0.0, 1.0 - exp(-4.0 * delta))
 	var sn := clampf(speed / maxf(p("SPEED"), 1.0), 0.0, 1.0)
 	if state == State.GRABBED:

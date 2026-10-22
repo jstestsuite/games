@@ -1,7 +1,8 @@
 extends SceneTree
 ## Tuning probe: puts the lion near one animal in different postures and reports how
-## it reacts, then runs scripted chases (burst, run, pounce, hold the grip) against each
-## species from several distances. Not pass/fail. Use it after changing Tuning.
+## it reacts, then runs scripted chases (burst, run, pounce) against each species from
+## several distances. A chase counts as caught when a pounce lands (the grapple after
+## that is grapple_sim.gd's job). Not pass/fail. Use it after changing Tuning.
 ## Each chase runs RUNS times; results show catches / runs and the average time.
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/hunt_sim.gd
@@ -66,13 +67,13 @@ func _physics_process(delta: float) -> bool:
 		var d: float = p.global_position.distance_to(_g.global_position)
 		_min_d = minf(_min_d, d)
 		if sc[5]:
-			# Steer at the animal by aiming the camera at it; pounce when close; hold the grip.
+			# Steer at the animal by aiming the camera at it; pounce when close.
 			var to: Vector3 = _g.global_position - p.global_position
 			p._cam_yaw = atan2(-to.x, -to.z)
 			if d < 4.0 and p.state == p.State.MOVE and p._pounce_cd <= 0.0:
-				Input.action_press("pounce")   # held from here: keeps the grip once it lands
-				p._start_pounce()
-		done = _g.is_dead
+				Input.action_press("pounce")   # held: keeps the grip once it lands
+				p.try_pounce()
+		done = _g.is_dead or _g.state == 4   # GRABBED
 	if _t >= sc[4] or done:
 		_record(sc, done)
 		_run += 1
@@ -143,6 +144,9 @@ func _setup() -> void:
 	p.sprinting = false
 	p.state = 0
 	p.grab_target = null
+	p.grapple = null
+	p.pounces = TU.POUNCE_STOCK
+	GS.injured = false
 	Input.action_press("move_forward")
 	if sc[2] != "":
 		Input.action_press(sc[2])

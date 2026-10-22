@@ -3,8 +3,10 @@ extends BigCat
 ## A rival male: a nomad you can meet, the pride male you must beat, or a challenger.
 ## IDLE (lies at home or wanders) -> STANDOFF (faces you and roars) -> FIGHT.
 ## In a fight every attack has a visible tell: "!" (yellow) = swipe coming,
-## "!!" (red, crouching) = lunge coming. Dodge it. Swipes never interrupt him, but a
-## pounce that lands during any windup staggers him. Spam swipes and he answers back.
+## "!!" (red, crouching) = lunge coming. Dodge it, or it lands and he's on you in a
+## clinch (you start behind). Your pounce landing on him starts a clinch with you ahead.
+## The clinch itself is run by the player's Grapple; he just holds still and rears.
+## Swipes never interrupt him; spam them and he answers back.
 ## At low health he YIELDs and runs off; that's a win.
 
 signal yielded(rival: Rival)
@@ -20,6 +22,7 @@ var forced := false           # walks to the player to start a fight
 var can_disengage := true     # if false, running away doesn't end the fight
 var rstate := RState.IDLE
 var move := Move.NONE
+var clinched := false
 
 var _t := 0.0                 # time in current move
 var _st := 0.0                # time in current rstate
@@ -102,6 +105,16 @@ func _physics_process(delta: float) -> void:
 	drift = Vector3.ZERO
 	if player == null or not is_instance_valid(player):
 		_move_body(delta)
+		return
+	if clinched:
+		# Locked with the player, who positions us. Just rear and push.
+		speed = 0.0
+		knock = Vector3.ZERO
+		marker.visible = false
+		name_tag.visible = false
+		rig.paw = 0.5 + 0.3 * sin(_st * 8.0)
+		rig.lunge = 0.8
+		_pose_rig(delta, 0.0, 0.0, 0.0)
 		return
 	var d := flat_dist(player)
 	match rstate:
@@ -211,8 +224,12 @@ func _fight(delta: float, d: float) -> void:
 			speed = Tuning.POUNCE_SPEED
 			if not _hit_done and _player_in_arc(Tuning.POUNCE_CATCH_RADIUS + 0.4, 110.0):
 				_hit_done = true
-				player.take_hit(scaled_damage(Tuning.LUNGE_DAMAGE), global_position, true)
-				speed *= 0.3
+				speed = 0.0
+				if player.in_grapple():
+					player.take_hit(scaled_damage(Tuning.LUNGE_DAMAGE), global_position, true)
+				else:
+					player.start_clinch(self, -Tuning.CLINCH_START_EDGE)
+					return
 			if _t >= Tuning.POUNCE_DURATION:
 				speed *= 0.4
 				_after_attack()
@@ -296,6 +313,46 @@ func _player_in_arc(reach: float, arc_deg: float) -> bool:
 
 func health_max() -> float:
 	return super.health_max() * Tuning.RIVAL_HEALTH_MULT
+
+
+## Your pounce can lock him up unless he's mid-dodge or done.
+func can_clinch() -> bool:
+	return not clinched and rstate != RState.YIELD and move != Move.DODGE and not is_dead
+
+
+func enter_clinch() -> void:
+	clinched = true
+	_set_r(RState.FIGHT)
+	_set_move(Move.NONE)
+	_st = 0.0
+
+
+## `pinned` = the player won: he's down for a while.
+func exit_clinch(pinned: bool) -> void:
+	if not clinched:
+		return
+	clinched = false
+	if rstate == RState.YIELD:
+		return
+	knock = (global_position - player.global_position).normalized() * Tuning.KNOCKBACK
+	if pinned:
+		_set_move(Move.STAGGER)
+		_t = -Tuning.STAGGER_TIME * 1.5   # stays down longer than a normal stagger
+		_flash("PINNED", Color(0.7, 1.0, 0.7), 1.2)
+	else:
+		_set_move(Move.RECOVER)
+	_think_t = Tuning.RIVAL_THINK_TIME
+
+
+## Damage dealt inside a clinch: no blocks, flinches or counters, but he can still yield.
+func clinch_damage(amount: float) -> void:
+	if is_invulnerable() and rstate == RState.YIELD:
+		return
+	health -= amount
+	_since_hurt = 0.0
+	if health <= health_max() * Tuning.RIVAL_YIELD_AT:
+		clinched = false
+		_yield()
 
 
 func is_invulnerable() -> bool:

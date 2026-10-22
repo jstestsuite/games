@@ -12,6 +12,8 @@ var detail := FastNoiseLite.new()
 var rng := RandomNumberGenerator.new()
 ## Each patch: Vector3(x, z, radius)
 var tall_patches: Array[Vector3] = []
+## Solid things animals should steer around: Vector3(x, z, radius). Trees, rocks, the den.
+var obstacles: Array[Vector3] = []
 var wind_dir := Vector2(1, 0)
 var grass_materials: Array[ShaderMaterial] = []
 
@@ -63,6 +65,30 @@ func random_open_point(margin := 30.0) -> Vector3:
 	var x := rng.randf_range(-half, half)
 	var z := rng.randf_range(-half, half)
 	return Vector3(x, height_at(x, z), z)
+
+
+## Bend a desired direction around obstacles within `look` metres ahead.
+## Cheap steering, not pathfinding: good enough for open savanna with scattered rocks.
+func avoid(pos: Vector3, dir: Vector3, look := 6.0, body_r := 0.6) -> Vector3:
+	var d := Vector3(dir.x, 0, dir.z)
+	if d.length() < 0.01:
+		return dir
+	d = d.normalized()
+	var push := Vector3.ZERO
+	for o in obstacles:
+		var to := Vector3(o.x - pos.x, 0, o.y - pos.z)
+		var along := to.dot(d)
+		if along < -o.z or along > look + o.z:
+			continue
+		var side := to - d * along
+		var clear := o.z + body_r
+		var s := side.length()
+		if s > clear:
+			continue
+		var away := -side / s if s > 0.01 else d.cross(Vector3.UP)
+		var near := 1.0 - clampf(along / (look + o.z), 0.0, 1.0)
+		push += away * (1.0 - s / clear) * (0.5 + near) * 2.0
+	return (d + push).normalized()
 
 
 func set_wind(dir: Vector2) -> void:
@@ -346,6 +372,7 @@ func _acacia(p: Vector3, bark: Material, leaves: Material) -> Node3D:
 	col.shape = cs
 	col.position.y = trunk_h * 0.5
 	tree.add_child(col)
+	obstacles.append(Vector3(p.x, p.z, cs.radius))
 	return tree
 
 
@@ -378,6 +405,7 @@ func _build_rocks() -> void:
 		col.shape = shape
 		body.add_child(col)
 		root.add_child(body)
+		obstacles.append(Vector3(p.x, p.z, shape.radius))
 
 
 func _build_backdrop() -> void:

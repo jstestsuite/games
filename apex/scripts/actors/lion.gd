@@ -1,18 +1,23 @@
 class_name Lion
 extends BigCat
 ## The player. Stalk (Ctrl), walk, sprint (Shift: a short burst that fades into a run),
-## pounce (Space; hold it to keep your grip in a takedown), swipe (LMB / F),
-## dodge (RMB / Alt), roar (Q), eat (E).
+## pounce (Space; you have a couple in reserve, they recharge), swipe (LMB / F), dodge (RMB / Alt), roar (Q), eat (E).
 ## Animals don't strafe: you steer a heading, and at speed you turn wide.
+##
+## A pounce that lands on prey starts a TAKEDOWN grapple; on a rival lion, a CLINCH.
+## Both are a Grapple (see grapple.gd): hold the pounce button to stay on, and push the
+## stick with each lurch the arrow warns of (away from a red bite in a clinch).
 
 signal roared(at: Vector3, radius: float)
 
-enum State { MOVE, POUNCE, TAKEDOWN, EATING, SWIPE, DODGE, STAGGER, DOWN }
+enum State { MOVE, POUNCE, SPRAWL, TAKEDOWN, CLINCH, EATING, SWIPE, DODGE, STAGGER, DOWN }
 
 var state := State.MOVE
 var charge := 0.0             # seconds of burst left in the tank
+var pounces := 2.0            # pounces in reserve (fractional while recharging)
 var sprinting := false        # charging or running
 var bursting := false         # the full-speed part of a sprint
+var gorging := false          # eating past full: it all becomes strength
 var winded_t := 0.0
 var stalking := false
 var in_cover := false
@@ -20,6 +25,8 @@ var notice_mult := 1.0
 var controls_enabled := true
 var last_hurt_by := ""
 var grab_target: Prey
+var clinch_rival: Rival
+var grapple: Grapple
 var eat_target: Prey
 
 var _sprint_t := 0.0
@@ -32,10 +39,13 @@ var _swipe_cd := 0.0
 var _swipe_done := false
 var _dodge_cd := 0.0
 var _dodge_dir := Vector3.ZERO
+var _stagger_len := 0.6
 var roar_cd := 0.0
 var _cam_yaw := 0.0
 var _cam_pitch := -0.22
+var _grab_cam_yaw := 0.0
 var _trauma := 0.0
+var _rng := RandomNumberGenerator.new()
 
 var cam_pivot: Node3D
 var spring: SpringArm3D
@@ -45,10 +55,12 @@ var camera: Camera3D
 func _ready() -> void:
 	add_to_group("player")
 	add_to_group("hunter")
+	_rng.randomize()
 	_init_body(true)
 	strength = GameState.strength
 	health = health_max()
 	charge = max_charge()
+	pounces = Tuning.POUNCE_STOCK
 
 	cam_pivot = Node3D.new()
 	cam_pivot.name = "CameraPivot"
@@ -69,13 +81,19 @@ func _ready() -> void:
 
 
 func max_charge() -> float:
-	return Tuning.CHARGE_TIME * GameState.mod("charge_time")
+	var m := Tuning.CHARGE_TIME * GameState.mod("charge_time")
+	return m * (Tuning.INJURED_CHARGE_MULT if GameState.injured else 1.0)
+
+
+func in_grapple() -> bool:
+	return state == State.TAKEDOWN or state == State.CLINCH
 
 
 ## Fresh start for a new day: full charge, not winded, standing.
 func wake() -> void:
 	state = State.MOVE
 	charge = max_charge()
+	pounces = Tuning.POUNCE_STOCK
 	winded_t = 0.0
 	sprinting = false
 	speed = 0.0
@@ -83,6 +101,8 @@ func wake() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if in_grapple():
+		return   # the camera is locked while you wrestle
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_cam_yaw -= event.relative.x * Tuning.MOUSE_SENS
 		_cam_pitch = clampf(_cam_pitch - event.relative.y * Tuning.MOUSE_SENS, -1.1, 0.35)
@@ -99,14 +119,22 @@ func _physics_process(delta: float) -> void:
 	if state != State.MOVE:
 		sprinting = false
 		bursting = false
+	if state != State.EATING:
+		gorging = false
 
 	match state:
 		State.MOVE:
 			_move(delta)
 		State.POUNCE:
 			_pounce(delta)
+		State.SPRAWL:
+			speed = move_toward(speed, 0.0, 40.0 * delta)
+			if _state_t > Tuning.POUNCE_MISS_TIME:
+				_set_state(State.MOVE)
 		State.TAKEDOWN:
 			_takedown(delta)
+		State.CLINCH:
+			_clinch(delta)
 		State.EATING:
 			_eat(delta)
 		State.SWIPE:
@@ -115,16 +143,18 @@ func _physics_process(delta: float) -> void:
 			_dodge(delta)
 		State.STAGGER:
 			speed = move_toward(speed, 0.0, 30.0 * delta)
-			if _state_t > Tuning.STAGGER_TIME:
+			if _state_t > _stagger_len:
 				_set_state(State.MOVE)
 		State.DOWN:
 			speed = move_toward(speed, 0.0, 30.0 * delta)
 
-	if not sprinting and state != State.DOWN:
+	if not sprinting and state != State.DOWN and not in_grapple():
 		var rate := Tuning.CHARGE_RECOVER
 		if speed <= Tuning.STALK_SPEED + 0.2:
 			rate *= Tuning.CHARGE_RECOVER_IDLE_MULT
 		charge = minf(max_charge(), charge + rate * delta)
+	if state != State.POUNCE and not in_grapple():
+		pounces = minf(Tuning.POUNCE_STOCK, pounces + delta / Tuning.POUNCE_RECHARGE)
 
 	if _since_hurt > Tuning.HEALTH_REGEN_DELAY and GameState.hunger > 0.0 and not is_dead:
 		health = minf(health_max(), health + Tuning.HEALTH_REGEN * GameState.mod("health_regen") * delta)
@@ -133,6 +163,8 @@ func _physics_process(delta: float) -> void:
 	in_cover = terrain != null and terrain.is_in_tall_grass(global_position)
 	refresh_look(GameState.mane_darkness())
 	_update_rig(delta)
+	if state == State.MOVE:
+		_show_risk()
 
 
 func _process(delta: float) -> void:
@@ -142,7 +174,7 @@ func _process(delta: float) -> void:
 
 ## Right stick turns the camera (the mouse does it in _unhandled_input).
 func _pad_look(delta: float) -> void:
-	if not controls_enabled:
+	if not controls_enabled or in_grapple():
 		return
 	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down", Tuning.PAD_DEADZONE)
 	if look == Vector2.ZERO:
@@ -181,6 +213,7 @@ func _move(delta: float) -> void:
 	elif not want_sprint:
 		sprinting = false
 
+	var injured := Tuning.INJURED_SPEED_MULT if GameState.injured else 1.0
 	var target_speed := 0.0
 	bursting = false
 	if sprinting:
@@ -191,7 +224,7 @@ func _move(delta: float) -> void:
 			charge = maxf(0.0, charge - delta)
 		else:
 			_fade = minf(1.0, _fade + delta / Tuning.CHARGE_FADE)
-		target_speed = lerpf(Tuning.CHARGE_SPEED, Tuning.RUN_SPEED, smoothstep(0.0, 1.0, _fade))
+		target_speed = lerpf(Tuning.CHARGE_SPEED, Tuning.RUN_SPEED, smoothstep(0.0, 1.0, _fade)) * injured
 		if _sprint_t > Tuning.RUN_WINDED_TIME * GameState.mod("run_time"):
 			sprinting = false
 			winded_t = Tuning.WINDED_TIME
@@ -221,7 +254,7 @@ func _move(delta: float) -> void:
 	if not controls_enabled:
 		return
 	if Input.is_action_just_pressed("pounce") and _pounce_cd <= 0.0:
-		_start_pounce()
+		try_pounce()
 	elif Input.is_action_just_pressed("swipe") and _swipe_cd <= 0.0:
 		_start_swipe()
 	elif Input.is_action_just_pressed("dodge") and _dodge_cd <= 0.0:
@@ -236,13 +269,20 @@ func _move(delta: float) -> void:
 			GameState.message.emit("Nothing to eat here.")
 
 
-# --- pounce and takedown -----------------------------------------------------
+# --- pounce -----------------------------------------------------------------
 
-func _start_pounce() -> void:
+## Pounce if you have one in reserve. Returns false (and says so) if you're out of breath.
+func try_pounce() -> bool:
+	if pounces < 1.0:
+		GameState.message.emit("No breath to pounce.")
+		_pounce_cd = 0.3
+		return false
+	pounces -= 1.0
 	_set_state(State.POUNCE)
 	_pounce_hit = false
 	velocity.y = 5.0
 	_trauma = maxf(_trauma, 0.25)
+	return true
 
 
 func _pounce(delta: float) -> void:
@@ -253,22 +293,28 @@ func _pounce(delta: float) -> void:
 		face_towards(target.global_position, Tuning.POUNCE_HOMING, delta)
 	var prey := _find_prey(Tuning.POUNCE_CATCH_RADIUS)
 	if prey and prey.grab(self):
-		grab_target = prey
-		_set_state(State.TAKEDOWN)
-		_trauma = 0.5
+		_start_takedown(prey)
 		return
-	if not _pounce_hit:
-		for e in targets_in_arc("enemy", Tuning.POUNCE_CATCH_RADIUS, 100.0):
+	for e in targets_in_arc("enemy", Tuning.POUNCE_CATCH_RADIUS, 100.0):
+		if e is Rival:
+			if (e as Rival).can_clinch():
+				start_clinch(e, Tuning.CLINCH_START_EDGE)
+				return
+		elif not _pounce_hit:
 			_pounce_hit = true
 			e.take_hit(_attack_damage(Tuning.LUNGE_DAMAGE) * GameState.mod("lunge_damage"), global_position, true)
 			_trauma = 0.6
 			_hitstop()
-		if _pounce_hit:
 			speed *= 0.3
 	if _state_t >= Tuning.POUNCE_DURATION:
-		_set_state(State.MOVE)
 		_pounce_cd = Tuning.POUNCE_COOLDOWN
-		speed *= 0.45   # landing kills momentum: a missed pounce costs you
+		if _pounce_hit:
+			_set_state(State.MOVE)
+			speed *= 0.45
+		else:
+			# A miss leaves you sprawled in the dirt for a moment.
+			_set_state(State.SPRAWL)
+			speed *= 0.3
 
 
 func _find_prey(radius: float) -> Prey:
@@ -287,25 +333,118 @@ func _find_prey(radius: float) -> Prey:
 	return best
 
 
+# --- takedown grapple ----------------------------------------------------------
+
+## Your power against prey: strength (and traits), plus any lionesses close enough to
+## join in. `potential` counts lionesses nearby rather than ones already holding on.
+func prey_power(prey: Prey, potential := false) -> float:
+	var pw := GameState.strength * GameState.mod("takedown")
+	var helpers := 0
+	if potential:
+		for l in get_tree().get_nodes_in_group("lioness"):
+			var li := l as Lioness
+			if li and li.lstate != Lioness.LState.DEN and li.lstate != Lioness.LState.LEAVE \
+					and li.global_position.distance_to(prey.global_position) < 35.0:
+				helpers += 1
+	else:
+		for g in prey.grabbers:
+			if is_instance_valid(g) and g != self and g.is_in_group("lioness"):
+				helpers += 1
+	return pw + helpers * Tuning.LIONESS_GRAB_POWER
+
+
+## EASY / FAIR / RISKY / DEADLY for you right now, with its colour.
+static func risk_label(ratio: float) -> Array:
+	if ratio >= 1.25:
+		return ["EASY", Color(0.5, 1.0, 0.5)]
+	if ratio >= 0.95:
+		return ["FAIR", Color(1.0, 0.9, 0.4)]
+	if ratio >= 0.7:
+		return ["RISKY", Color(1.0, 0.6, 0.2)]
+	return ["DEADLY", Color(1.0, 0.25, 0.2)]
+
+
+## Label the animal you're looking at with how risky it is to grab.
+func _show_risk() -> void:
+	var fwd := Vector3(-sin(_cam_yaw), 0, -cos(_cam_yaw))
+	var best: Prey = null
+	var best_d := Tuning.RISK_SHOW_RANGE
+	for node in get_tree().get_nodes_in_group("prey"):
+		var g := node as Prey
+		if g == null or g.is_dead:
+			continue
+		var to := g.global_position - global_position
+		to.y = 0
+		var d := to.length()
+		if d < best_d and d > 0.1 and fwd.dot(to / d) > 0.8:
+			best_d = d
+			best = g
+	if best:
+		var lab := risk_label(prey_power(best, true) / maxf(0.05, best.p("POWER")))
+		best.show_risk(lab[0], lab[1])
+
+
+func _start_takedown(prey: Prey) -> void:
+	grab_target = prey
+	grapple = Grapple.new()
+	grapple.setup_prey(prey, prey_power(prey))
+	_set_state(State.TAKEDOWN)
+	_grab_cam_yaw = heading
+	_trauma = 0.5
+	_slowmo()
+
+
 func _takedown(delta: float) -> void:
-	if not is_instance_valid(grab_target):
+	if not is_instance_valid(grab_target) or grab_target.is_dead:
+		_end_grapple()
 		_set_state(State.MOVE)
 		return
-	if grab_target.is_dead:
-		_on_kill(grab_target)
-		return
 	if grab_target.state != Prey.State.GRABBED or not grab_target.grabbers.has(self):
-		grab_target = null
+		_end_grapple()
 		_set_state(State.MOVE)
 		return
 	if controls_enabled and not Input.is_action_pressed("pounce"):
 		# Let go: it bolts.
 		grab_target.release(self)
-		grab_target = null
+		_end_grapple()
 		_pounce_cd = Tuning.POUNCE_COOLDOWN
 		_set_state(State.MOVE)
-		GameState.message.emit("It broke free!")
+		GameState.message.emit("You let go.")
 		return
+
+	# Lionesses holding on make it easier.
+	var helpers := 0
+	for g in grab_target.grabbers:
+		if is_instance_valid(g) and g != self and g.is_in_group("lioness"):
+			helpers += 1
+	grapple.assist = helpers * Tuning.LIONESS_GRAB_POWER / maxf(0.05, grab_target.p("POWER"))
+	grapple.assist_progress = helpers * Tuning.LIONESS_HOLD_PROGRESS
+
+	var res := grapple.update(delta, _input_vector())
+	# Show the lurch on the animal: it leans during the warning and yanks on the window.
+	var world := _screen_to_world(grapple.dir)
+	grab_target.lean = world * grapple.tell_fraction() if grapple.phase == Grapple.Phase.TELL else Vector3.ZERO
+	if res != 0:
+		grab_target.lurch(world)
+	if res < 0:
+		var r := clampf(grapple.effective_ratio(), 0.5, 2.0)
+		take_beast_hit(grab_target.p("GRAB_DAMAGE") / r, grab_target.global_position, false,
+				grab_target.display_name().to_lower())
+		if is_dead:
+			return
+	elif res > 0:
+		_trauma = maxf(_trauma, 0.2)
+
+	if grapple.progress >= 1.0:
+		var prey := grab_target
+		_end_grapple()
+		prey.die()
+		_on_kill(prey)
+		return
+	if grapple.grip <= 0.0:
+		_thrown_off()
+		return
+
 	# Hang on to its flank.
 	var pf := Vector3(-sin(grab_target.heading), 0, -cos(grab_target.heading))
 	var pr := pf.cross(Vector3.UP)
@@ -316,8 +455,34 @@ func _takedown(delta: float) -> void:
 	speed = 0.0
 
 
-func _on_kill(prey: Prey) -> void:
+func _thrown_off() -> void:
+	var prey := grab_target
+	prey.release(self)
+	_end_grapple()
+	knock = (global_position - prey.global_position).normalized() * Tuning.KNOCKBACK * 1.6
+	_stagger(Tuning.STAGGER_TIME * 1.6)
+	_trauma = 0.8
+	if _rng.randf() < prey.p("INJURY_CHANCE"):
+		GameState.injured = true
+		GameState.message.emit("Thrown off, and injured! Your charge is weak until you sleep.")
+	else:
+		GameState.message.emit("Thrown off!")
+
+
+func _end_grapple() -> void:
+	if is_instance_valid(grab_target):
+		grab_target.lean = Vector3.ZERO
 	grab_target = null
+	grapple = null
+	clinch_rival = null
+
+
+## Arrow directions are on screen; this is where they point on the ground.
+func _screen_to_world(d: Vector2) -> Vector3:
+	return Vector3(d.x, 0, d.y).rotated(Vector3.UP, _grab_cam_yaw)
+
+
+func _on_kill(prey: Prey) -> void:
 	GameState.register_kill(prey.display_name())
 	_trauma = 0.7
 	_hitstop()
@@ -329,6 +494,91 @@ func _hitstop() -> void:
 	Engine.time_scale = 0.05
 	get_tree().create_timer(Tuning.HITSTOP_TIME, true, false, true).timeout.connect(
 		func(): Engine.time_scale = 1.0)
+
+
+## The moment you latch on: time slows while the camera swings in.
+func _slowmo() -> void:
+	if Tuning.GRAB_SLOWMO_TIME <= 0.0:
+		return
+	Engine.time_scale = Tuning.GRAB_SLOWMO_SCALE
+	get_tree().create_timer(Tuning.GRAB_SLOWMO_TIME, true, false, true).timeout.connect(
+		func(): Engine.time_scale = 1.0)
+
+
+# --- clinch with a rival ---------------------------------------------------------
+
+## Lock up with a rival. `edge` > 0 means you had the initiative.
+func start_clinch(r: Rival, edge: float) -> void:
+	if in_grapple() or is_dead:
+		return
+	clinch_rival = r
+	grapple = Grapple.new()
+	grapple.setup_rival(GameState.strength * GameState.mod("clinch"), r.strength, edge)
+	r.enter_clinch()
+	var to := r.global_position - global_position
+	heading = atan2(-to.x, -to.z)
+	_grab_cam_yaw = heading
+	speed = 0.0
+	_set_state(State.CLINCH)
+	_trauma = 0.5
+	_slowmo()
+	GameState.message.emit("Clinch!" if edge >= 0.0 else "He's on you!")
+
+
+func _clinch(delta: float) -> void:
+	var r := clinch_rival
+	if not is_instance_valid(r) or r.rstate == Rival.RState.YIELD:
+		_end_grapple()
+		_set_state(State.MOVE)
+		return
+	speed = 0.0
+	# He stays locked face to face with you.
+	r.global_position.x = global_position.x + forward().x * 1.7
+	r.global_position.z = global_position.z + forward().z * 1.7
+	r.heading = heading + PI
+
+	if controls_enabled and not Input.is_action_pressed("pounce"):
+		# Breaking off early gives him a parting bite.
+		take_hit(r.scaled_damage(Tuning.CLINCH_BITE_DAMAGE), r.global_position, false)
+		_break_clinch(false)
+		GameState.message.emit("You broke away.")
+		return
+
+	var res := grapple.update(delta, _input_vector())
+	if res > 0:
+		r.clinch_damage(_attack_damage(Tuning.CLINCH_HIT_DAMAGE))
+		_trauma = maxf(_trauma, 0.25)
+	elif res < 0:
+		var dmg := Tuning.CLINCH_BITE_DAMAGE if grapple.is_bite else Tuning.CLINCH_SHOVE_DAMAGE
+		take_hit(r.scaled_damage(dmg), r.global_position, false)
+	if is_dead or not is_instance_valid(r):
+		return
+	if grapple.balance >= 1.0:
+		r.clinch_damage(_attack_damage(Tuning.CLINCH_PIN_DAMAGE))
+		GameState.message.emit("You pinned him!")
+		_hitstop()
+		_break_clinch(true)
+	elif grapple.balance <= -1.0:
+		GameState.message.emit("He pinned you!")
+		var dmg := r.scaled_damage(Tuning.CLINCH_PIN_DAMAGE)
+		_break_clinch(false)
+		take_hit(dmg, r.global_position, true)
+		if _rng.randf() < Tuning.CLINCH_PIN_INJURY:
+			GameState.injured = true
+	elif grapple.age >= Tuning.CLINCH_MAX_TIME:
+		GameState.message.emit("You break apart.")
+		_break_clinch(false)
+
+
+## End a clinch. `won` = you pinned him: he goes down for a while.
+func _break_clinch(won: bool) -> void:
+	var r := clinch_rival
+	_end_grapple()
+	_set_state(State.MOVE)
+	_pounce_cd = Tuning.POUNCE_COOLDOWN
+	if is_instance_valid(r):
+		r.exit_clinch(won)
+		knock = (global_position - r.global_position).normalized() * Tuning.KNOCKBACK
 
 
 # --- eating -----------------------------------------------------------------
@@ -361,12 +611,16 @@ func _eat(delta: float) -> void:
 		GameState.message.emit("Picked clean.")
 		return
 	face_towards(eat_target.global_position, 6.0, delta)
-	if GameState.hunger >= Tuning.HUNGER_MAX - 0.01:
-		_set_state(State.MOVE)
-		GameState.message.emit("You're full.")
-		return
-	var got := eat_target.take_food(Tuning.EAT_RATE * GameState.mod("eat_rate") * delta)
-	GameState.eat(got)
+	var rate := Tuning.EAT_RATE * GameState.mod("eat_rate")
+	var was_gorging := gorging
+	gorging = GameState.hunger >= Tuning.HUNGER_MAX - 0.01
+	if gorging:
+		# Full: keep eating slower, and it all goes into strength.
+		if not was_gorging:
+			GameState.message.emit("Full. Gorging: the rest becomes strength.")
+		GameState.gorge(eat_target.take_food(rate * Tuning.GORGE_RATE_MULT * delta))
+	else:
+		GameState.eat(eat_target.take_food(rate * delta))
 	# Any other action stops the meal.
 	if controls_enabled and (_input_vector().length() > 0.1 or Input.is_action_just_pressed("swipe") \
 			or Input.is_action_just_pressed("dodge") or Input.is_action_just_pressed("roar") \
@@ -446,6 +700,11 @@ func _roar() -> void:
 	roared.emit(global_position, Tuning.ROAR_RADIUS * GameState.mod("roar_radius"))
 
 
+func _stagger(t: float) -> void:
+	_stagger_len = t
+	_set_state(State.STAGGER)
+
+
 ## Hits from lions.
 func take_hit(damage: float, from: Vector3, heavy: bool) -> void:
 	last_hurt_by = "a rival lion"
@@ -473,18 +732,27 @@ func _on_hit(damage: float, heavy: bool) -> void:
 	_trauma = maxf(_trauma, clampf(damage / 25.0, 0.3, 0.9))
 	if state == State.EATING:
 		_set_state(State.MOVE)
-	if heavy and state != State.DOWN:
+	if in_grapple():
+		# Kicks during a takedown are part of the struggle; a heavy hit from elsewhere breaks it.
+		if not heavy:
+			return
 		if state == State.TAKEDOWN and is_instance_valid(grab_target):
 			grab_target.release(self)
-			grab_target = null
-		_set_state(State.STAGGER)
+		elif state == State.CLINCH and is_instance_valid(clinch_rival):
+			clinch_rival.exit_clinch(false)
+		_end_grapple()
+	if heavy and state != State.DOWN:
+		_stagger(Tuning.STAGGER_TIME * 1.5)
 
 
 func _on_health_gone() -> void:
 	super._on_health_gone()
-	_set_state(State.DOWN)
 	if is_instance_valid(grab_target):
 		grab_target.release(self)
+	if is_instance_valid(clinch_rival):
+		clinch_rival.exit_clinch(true)
+	_end_grapple()
+	_set_state(State.DOWN)
 
 
 ## How "loud/visible" the lion is right now, before distance and cover.
@@ -492,7 +760,7 @@ func get_posture() -> float:
 	match state:
 		State.EATING:
 			return Tuning.POSTURE_WALK * 0.6
-		State.POUNCE, State.TAKEDOWN:
+		State.POUNCE, State.TAKEDOWN, State.CLINCH, State.SPRAWL:
 			return Tuning.POSTURE_SPRINT
 		State.SWIPE, State.DODGE, State.STAGGER:
 			return Tuning.POSTURE_WALK * 2.0
@@ -522,9 +790,16 @@ func _update_rig(delta: float) -> void:
 			head_down = 0.5
 			rig.lunge = 0.6
 			speed_norm = 0.6
+		State.CLINCH:
+			# Reared up, paws locked on him.
+			rig.lunge = 0.8
+			rig.paw = 0.5 + 0.3 * sin(_state_t * 9.0)
 		State.POUNCE:
 			speed_norm = 1.0
 			rig.lunge = 1.0
+		State.SPRAWL:
+			crouch = 1.0
+			rig.lunge = 0.7
 		State.SWIPE:
 			rig.paw = sin(clampf(_state_t / Tuning.SWIPE_TIME, 0.0, 1.0) * PI)
 		State.DOWN:
@@ -536,13 +811,22 @@ func _update_rig(delta: float) -> void:
 
 
 func _update_camera(delta: float) -> void:
-	var target := global_position + Vector3(0, Tuning.CAM_HEIGHT * (0.75 if stalking else 1.0), 0)
+	var grappling := in_grapple()
+	if grappling:
+		# Swing in close behind your shoulder and hold still while you wrestle.
+		_cam_yaw = lerp_angle(_cam_yaw, _grab_cam_yaw, 1.0 - exp(-8.0 * delta))
+		_cam_pitch = lerpf(_cam_pitch, -0.32, 1.0 - exp(-6.0 * delta))
+	var target := global_position + Vector3(0, Tuning.CAM_HEIGHT * (0.75 if stalking or grappling else 1.0), 0)
 	cam_pivot.global_position = cam_pivot.global_position.lerp(target, 1.0 - exp(-14.0 * delta))
 	cam_pivot.rotation = Vector3(_cam_pitch, _cam_yaw, 0)
 	var speed_t := clampf(speed / Tuning.CHARGE_SPEED, 0.0, 1.0)
 	var fov_target := lerpf(Tuning.FOV_BASE, Tuning.FOV_SPRINT, speed_t * speed_t)
+	var dist := Tuning.CAM_DISTANCE * (1.0 + speed_t * 0.25)
+	if grappling:
+		fov_target = Tuning.FOV_BASE - 6.0
+		dist = Tuning.GRAB_CAM_DISTANCE
 	camera.fov = lerpf(camera.fov, fov_target, 1.0 - exp(-4.0 * delta))
-	spring.spring_length = lerpf(spring.spring_length, Tuning.CAM_DISTANCE * (1.0 + speed_t * 0.25), 1.0 - exp(-3.0 * delta))
+	spring.spring_length = lerpf(spring.spring_length, dist, 1.0 - exp(-(8.0 if grappling else 3.0) * delta))
 
 	_trauma = maxf(0.0, _trauma - delta * 1.6)
 	var shake := _trauma * _trauma

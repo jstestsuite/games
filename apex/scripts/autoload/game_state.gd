@@ -20,13 +20,16 @@ var kills_today := 0
 var rivals_beaten := 0
 var pride_food := 0.0        # food the lionesses ate today
 var lionesses := 0           # how many still follow you
+var pride_since_day := 0     # the day you took the pride
+var injured := false         # thrown or pinned badly: weaker charge until you sleep
 var traits: Array[String] = []
 
 ## Trait definitions. "mods" multiply values looked up through mod().
 const TRAITS := {
 	"thick_mane":  {"name": "Thick Mane",   "desc": "Take 20% less damage from lions.",            "mods": {"damage_taken": 0.8}},
 	"heavy_paws":  {"name": "Heavy Paws",   "desc": "Swipes hit 35% harder.",                      "mods": {"swipe_damage": 1.35}},
-	"crushing_jaws": {"name": "Crushing Jaws", "desc": "Lunges hit 30% harder. Takedowns 25% faster.", "mods": {"lunge_damage": 1.3, "takedown": 1.25}},
+	"crushing_jaws": {"name": "Crushing Jaws", "desc": "Grapple as if 25% stronger against prey. Lunges hit 30% harder.", "mods": {"lunge_damage": 1.3, "takedown": 1.25}},
+	"wrestler":    {"name": "Wrestler",     "desc": "Clinch as if 25% stronger against lions.", "mods": {"clinch": 1.25}},
 	"long_charge": {"name": "Long Charge",  "desc": "Your burst lasts 40% longer.",                "mods": {"charge_time": 1.4}},
 	"deep_lungs":  {"name": "Deep Lungs",   "desc": "Run 50% longer before you're winded.",        "mods": {"run_time": 1.5}},
 	"silent_paws": {"name": "Silent Paws",  "desc": "Stalking is 40% harder to notice.",           "mods": {"stalk_noise": 0.6}},
@@ -63,6 +66,8 @@ func new_run() -> void:
 	rivals_beaten = 0
 	pride_food = 0.0
 	lionesses = 0
+	pride_since_day = 0
+	injured = false
 	traits.clear()
 	phase = Phase.HUNTING
 	hunger_changed.emit(hunger)
@@ -88,6 +93,11 @@ func add_strength(amount: float) -> void:
 ## Food eaten by the player: feeds you and builds strength.
 func eat(amount: float) -> void:
 	add_hunger(amount)
+	add_strength(amount * Tuning.STRENGTH_PER_FOOD * mod("strength_gain"))
+
+
+## Eating past full: no hunger, but all of it becomes strength.
+func gorge(amount: float) -> void:
 	add_strength(amount * Tuning.STRENGTH_PER_FOOD * mod("strength_gain"))
 
 

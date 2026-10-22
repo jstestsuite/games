@@ -72,6 +72,18 @@ func face_towards(p: Vector3, rate: float, delta: float) -> void:
 		heading = lerp_angle(heading, atan2(-to.x, -to.z), 1.0 - exp(-rate * delta))
 
 
+## Like face_towards, but bends around rocks and trees on the way.
+func steer_towards(p: Vector3, rate: float, delta: float) -> void:
+	var to := p - global_position
+	to.y = 0
+	if to.length() < 0.05:
+		return
+	var dir := to.normalized()
+	if terrain:
+		dir = terrain.avoid(global_position, dir, 3.0 + speed * 0.4, 0.7)
+	heading = lerp_angle(heading, atan2(-dir.x, -dir.z), 1.0 - exp(-rate * delta))
+
+
 func flat_dist(n: Node3D) -> float:
 	var d := n.global_position - global_position
 	d.y = 0

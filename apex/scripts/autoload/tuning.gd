@@ -14,7 +14,7 @@ const SAVE_PATH := "user://tuning.cfg"
 # --- Run ---------------------------------------------------------------
 @export_group("Run")
 @export_range(30, 600, 5) var DAY_LENGTH := 150.0         ## seconds of real time per day
-@export_range(1, 8, 1) var NOMAD_DAYS := 3                ## days alone before the challenge day
+@export_range(1, 8, 1) var NOMAD_DAYS := 2                ## days alone before the challenge day
 @export_range(0, 5, 1) var PRIDE_DAYS := 1                ## full days holding the pride after the challenge day
 @export var PAUSE_DAY_IN_FIGHTS := true                   ## the clock stops while a lion fight is on
 
@@ -31,9 +31,9 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_group("Hunger")
 @export_range(10, 300, 5) var HUNGER_MAX := 100.0
 @export_range(0, 300, 5) var HUNGER_START := 70.0
-@export_range(0, 3, 0.01) var HUNGER_DRAIN := 0.25        ## per second, always
+@export_range(0, 3, 0.01) var HUNGER_DRAIN := 0.35        ## per second, always
 @export_range(0, 5, 0.05) var HUNGER_DRAIN_RUN := 0.8     ## extra per second while charging or running
-@export_range(0, 100, 1) var HUNGER_NIGHT_COST := 20.0    ## paid when sleeping between days
+@export_range(0, 100, 1) var HUNGER_NIGHT_COST := 25.0    ## paid when sleeping between days
 @export_range(0, 20, 0.5) var STARVE_DAMAGE := 2.0        ## health per second lost at 0 hunger
 
 @export_group("Health")
@@ -71,19 +71,56 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(0.5, 10, 0.1) var TURN_RATE_SPRINT := 2.4   ## lower = wider turns at speed
 
 # --- Pounce and takedown ---------------------------------------------------
-@export_group("Pounce and takedown")
+@export_group("Pounce")
 @export_range(5, 50, 0.5) var POUNCE_SPEED := 26.0
 @export_range(0.1, 1, 0.01) var POUNCE_DURATION := 0.34
 @export_range(0.5, 5, 0.1) var POUNCE_CATCH_RADIUS := 2.4
 @export_range(0, 3, 0.05) var POUNCE_COOLDOWN := 0.9
 @export_range(0, 20, 0.5) var POUNCE_HOMING := 6.0         ## how hard a pounce curves toward nearby prey
-@export_range(0.2, 10, 0.1) var TAKEDOWN_TIME := 1.6       ## seconds to bring down toughness-1 prey at strength 1
-@export_range(0, 6, 0.1) var TAKEDOWN_DRAG_SPEED := 1.5  ## m/s a grabbed animal still drags you
-@export_range(0.1, 3, 0.05) var KICK_INTERVAL := 0.6       ## seconds between kick attempts while grabbed
+@export_range(1, 5, 1) var POUNCE_STOCK := 2                ## pounces you can make back to back; out of them, no pounce
+@export_range(0.5, 10, 0.25) var POUNCE_RECHARGE := 3.0    ## seconds to get one pounce back
+@export_range(0, 2, 0.05) var POUNCE_MISS_TIME := 0.6      ## sprawled on the ground after a miss
+
+@export_group("Grapple (prey)")
+@export_range(0, 1, 0.05) var GRAB_SLOWMO_SCALE := 0.3     ## time scale for the moment of the grab
+@export_range(0, 2, 0.05) var GRAB_SLOWMO_TIME := 0.5      ## real seconds of slow-mo
+@export_range(1, 10, 0.25) var GRAB_CAM_DISTANCE := 4.0    ## the camera pulls in this close
+@export_range(0.1, 3, 0.05) var GRAB_FIRST_WAIT := 0.7     ## pause before the first lurch
+@export_range(0.05, 3, 0.05) var GRAB_WAIT_MIN := 0.35     ## pause between lurches
+@export_range(0.05, 3, 0.05) var GRAB_WAIT_MAX := 1.0
+@export_range(0.05, 1, 0.01) var GRAB_WINDOW := 0.3        ## after the arrow, this long to push the right way
+@export_range(0, 1, 0.01) var GRAB_SUCCESS_GRIP := 0.08    ## grip regained per matched lurch
+@export_range(0, 1, 0.01) var GRAB_GRIP_REGEN := 0.04      ## grip regained per second between lurches
+@export_range(0, 2, 0.05) var LIONESS_GRAB_POWER := 0.6    ## each lioness holding on adds this to your power
+@export_range(0, 1, 0.01) var LIONESS_HOLD_PROGRESS := 0.06 ## takedown progress per second per lioness holding
+@export_range(0, 2, 0.05) var LIONESS_SOLO_NEED := 0.8     ## lionesses alone need this x the animal's power to hold it
+@export_range(0.2, 10, 0.1) var TAKEDOWN_TIME := 2.0       ## lionesses alone: seconds at power = the animal's
+@export_range(0, 6, 0.1) var TAKEDOWN_DRAG_SPEED := 1.5    ## m/s a grabbed animal still drags you
+@export_range(0, 12, 0.5) var GRAB_LURCH_SPEED := 5.0      ## how hard a lurch yanks the animal sideways
+@export_range(0.1, 3, 0.05) var KICK_INTERVAL := 0.6       ## lionesses alone: seconds between kicks
 @export_range(0, 1, 0.05) var KICK_CHANCE := 0.35
-@export_range(0, 2, 0.05) var LIONESS_TAKEDOWN_POWER := 0.8 ## each lioness holding on adds this (lion = strength)
+@export_range(0, 1, 0.05) var INJURED_CHARGE_MULT := 0.6   ## injured: your burst is this much shorter...
+@export_range(0.3, 1, 0.05) var INJURED_SPEED_MULT := 0.85 ## ...and this much slower, until you sleep
+@export_range(0, 40, 1) var RISK_SHOW_RANGE := 30.0        ## the risk label shows on the animal you're facing within this
 @export_range(0.5, 20, 0.5) var EAT_RATE := 9.0            ## food per second while eating
+@export_range(0, 1, 0.05) var GORGE_RATE_MULT := 0.5       ## when full you can keep gorging, slower, and it all becomes strength
 @export_range(5, 300, 5) var CARCASS_LIFETIME := 90.0      ## seconds before a carcass is gone
+
+@export_group("Clinch (rival lions)")
+@export_range(0.05, 2, 0.01) var CLINCH_TELL := 0.42       ## warning before each shove or bite
+@export_range(0.05, 3, 0.05) var CLINCH_WAIT_MIN := 0.3
+@export_range(0.05, 3, 0.05) var CLINCH_WAIT_MAX := 0.8
+@export_range(0, 1, 0.05) var CLINCH_BITE_CHANCE := 0.4    ## red arrow: a bite. Push AWAY from it, not with it
+@export_range(0, 1, 0.05) var CLINCH_FAKE_CHANCE := 0.15
+@export_range(0.05, 1, 0.01) var CLINCH_SHIFT_WIN := 0.3   ## balance you gain per exchange won (x strength ratio)
+@export_range(0.05, 1, 0.01) var CLINCH_SHIFT_LOSE := 0.45 ## balance you lose per exchange lost (/ strength ratio)
+@export_range(0, 1, 0.05) var CLINCH_START_EDGE := 0.25    ## whoever pounced starts this far ahead
+@export_range(0, 40, 0.5) var CLINCH_HIT_DAMAGE := 4.0     ## to him when you win an exchange
+@export_range(0, 60, 0.5) var CLINCH_BITE_DAMAGE := 12.0   ## to you when you miss a bite
+@export_range(0, 60, 0.5) var CLINCH_SHOVE_DAMAGE := 5.0   ## to you when he wins a shove
+@export_range(0, 100, 1) var CLINCH_PIN_DAMAGE := 28.0     ## whoever pins the other deals this
+@export_range(1, 30, 0.5) var CLINCH_MAX_TIME := 9.0       ## then you break apart
+@export_range(0, 1, 0.05) var CLINCH_PIN_INJURY := 0.5     ## chance being pinned injures you
 
 # --- Fighting --------------------------------------------------------------
 @export_group("Fighting (both sides)")
@@ -93,7 +130,7 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(0.05, 1, 0.01) var SWIPE_TIME := 0.32        ## whole swipe animation
 @export_range(0, 1, 0.01) var SWIPE_HIT_AT := 0.14         ## when in the swipe the paw lands
 @export_range(0, 2, 0.05) var SWIPE_COOLDOWN := 0.55
-@export_range(0, 100, 1) var LUNGE_DAMAGE := 22.0          ## pounce into a lion or hyena
+@export_range(0, 100, 1) var LUNGE_DAMAGE := 22.0          ## pounce into a hyena (into a lion starts a clinch)
 @export_range(5, 30, 0.5) var DODGE_SPEED := 13.0
 @export_range(0.05, 1, 0.01) var DODGE_TIME := 0.28        ## you can't be hit while dodging
 @export_range(0, 3, 0.05) var DODGE_COOLDOWN := 0.6
@@ -131,7 +168,7 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_group("Pride")
 @export_range(0, 6, 1) var LIONESS_COUNT := 3
 @export_range(0, 6, 1) var CUB_COUNT := 3
-@export_range(0, 500, 5) var PRIDE_FOOD_NEED := 150.0      ## food the lionesses must eat each day or one leaves
+@export_range(0, 500, 5) var PRIDE_FOOD_NEED := 120.0      ## feed them this much by dusk and they drive off a challenger
 @export_range(0.5, 20, 0.5) var LIONESS_EAT_RATE := 4.0
 @export_range(5, 40, 0.5) var LIONESS_CHARGE_SPEED := 19.0
 @export_range(3, 30, 0.5) var LIONESS_RUN_SPEED := 15.0
@@ -141,25 +178,28 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(2, 30, 0.5) var LIONESS_FOLLOW_SPREAD := 7.0
 @export_range(2, 40, 0.5) var LIONESS_FLANK_SPREAD := 16.0 ## how wide they fan out while you stalk
 @export_range(0, 2, 0.05) var LIONESS_NOTICE_MULT := 0.6   ## how visible lionesses are to prey
-@export_range(0, 2, 0.05) var LIONESS_TOUGHNESS_LIMIT := 1.0 ## a lioness alone can only grab prey this tough
 
 # --- Hyenas ----------------------------------------------------------------
 @export_group("Hyenas")
-@export_range(0, 1, 0.05) var HYENA_CHANCE := 0.85         ## chance hyenas come to a carcass
-@export_range(0, 60, 1) var HYENA_ARRIVE_DELAY := 14.0     ## seconds after the kill
-@export_range(0, 8, 1) var HYENA_BASE := 2
+@export_range(0, 8, 1) var HYENA_ROAMERS := 2              ## a clan that shadows you from the start of each day
+@export_range(0, 3, 0.5) var HYENA_ROAMERS_PER_DAY := 1.0  ## extra roamers per day number
+@export_range(5, 80, 1) var HYENA_SHADOW_DIST := 35.0      ## roamers keep about this far from you
+@export_range(10, 200, 5) var HYENA_NOTICE_RANGE := 90.0   ## roamers come to any kill this close
+@export_range(0, 1, 0.05) var HYENA_CHANCE := 0.7          ## chance more hyenas join at a carcass
+@export_range(0, 60, 1) var HYENA_ARRIVE_DELAY := 8.0      ## seconds after the kill
+@export_range(0, 8, 1) var HYENA_BASE := 1
 @export_range(0, 3, 0.5) var HYENA_PER_DAY := 0.5          ## extra hyenas per day number
 @export_range(2, 25, 0.5) var HYENA_SPEED := 11.0
-@export_range(5, 200, 5) var HYENA_HEALTH := 30.0
-@export_range(0, 40, 0.5) var HYENA_BITE_DAMAGE := 6.0
+@export_range(5, 200, 5) var HYENA_HEALTH := 45.0
+@export_range(0, 40, 0.5) var HYENA_BITE_DAMAGE := 8.0
 @export_range(0.05, 2, 0.05) var HYENA_DART_TELL := 0.35
-@export_range(0.5, 15, 0.5) var HYENA_DART_INTERVAL := 3.5 ## average seconds between darts per hyena
+@export_range(0.5, 15, 0.5) var HYENA_DART_INTERVAL := 2.5 ## average seconds between darts per hyena
 @export_range(2, 20, 0.5) var HYENA_GUARD_RADIUS := 8.0    ## they won't feed while a lion is this close to the carcass
 @export_range(0.5, 20, 0.5) var HYENA_EAT_RATE := 4.0      ## food per second each
 @export_range(0.5, 15, 0.5) var HYENA_SCATTER_TIME := 4.0
 @export_range(2, 40, 1) var ROAR_RADIUS := 14.0
 @export_range(0, 20, 0.5) var ROAR_COOLDOWN := 7.0
-@export_range(0, 1, 0.05) var ROAR_SCARE_CHANCE := 0.8     ## per hyena in range
+@export_range(0, 1, 0.05) var ROAR_SCARE_CHANCE := 0.6     ## per hyena in range
 @export_range(0, 120, 1) var ROAR_PREY_ALERT := 45.0       ## roaring spooks prey this close
 
 # --- Prey senses -----------------------------------------------------------
@@ -190,6 +230,7 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(1, 30, 0.5) var FLEE_TIME := 9.0             ## keeps running at least this long
 @export_range(2, 40, 0.5) var TIRE_TIME := 11.0            ## after this many seconds of fleeing, slows down
 @export_range(0.3, 1, 0.01) var TIRED_SPEED_MULT := 0.8
+@export_range(0, 1, 0.05) var HERD_WARINESS := 0.25         ## each time a herd is attacked it gets this much more watchful
 @export_range(0, 1, 0.05) var PREY_WEAK_CHANCE := 0.2     ## young or old animals: smaller and slower
 @export_range(0.3, 1, 0.01) var PREY_WEAK_SPEED_MULT := 0.82
 @export_range(0.1, 1, 0.05) var PREY_WEAK_FOOD_MULT := 0.7
@@ -198,33 +239,54 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_group("Warthog")
 @export_range(0, 8, 1) var WARTHOG_HERDS := 2
 @export_range(1, 12, 1) var WARTHOG_HERD_MIN := 1
-@export_range(1, 12, 1) var WARTHOG_HERD_MAX := 3
+@export_range(1, 12, 1) var WARTHOG_HERD_MAX := 2
 @export_range(3, 30, 0.5) var WARTHOG_SPEED := 14.0
 @export_range(0, 300, 5) var WARTHOG_FOOD := 30.0
-@export_range(0.1, 5, 0.05) var WARTHOG_TOUGHNESS := 0.4
-@export_range(0, 40, 0.5) var WARTHOG_KICK := 3.0
+@export_range(0.1, 5, 0.05) var WARTHOG_POWER := 0.6   ## your strength (plus helpers) vs this decides how hard the grapple is
+@export_range(1, 15, 1) var WARTHOG_GRAB_HITS := 2       ## lurches to match (at even power) to bring it down
+@export_range(0.1, 2, 0.01) var WARTHOG_GRAB_TELL := 0.7   ## warning before each lurch (longer when you're stronger)
+@export_range(2, 4, 2) var WARTHOG_GRAB_DIRS := 2       ## 2 = left/right only, 4 = any direction
+@export_range(0, 1, 0.05) var WARTHOG_GRAB_FAKE := 0.0   ## chance the arrow switches mid-warning
+@export_range(0, 1, 0.05) var WARTHOG_GRAB_DOUBLE := 0.0 ## chance of a second lurch right after one
+@export_range(0, 80, 1) var WARTHOG_GRAB_DAMAGE := 4.0  ## kick/horn damage when you miss a lurch
+@export_range(0, 1, 0.01) var WARTHOG_GRAB_GRIP_LOSS := 0.25 ## grip lost per missed lurch; at 0 you're thrown
+@export_range(0, 1, 0.05) var WARTHOG_INJURY_CHANCE := 0.0 ## chance being thrown off injures you
 @export_range(0.1, 3, 0.05) var WARTHOG_VIGILANCE := 0.8   ## sight multiplier
 @export_range(0, 2, 0.05) var WARTHOG_JINK := 1.2          ## radians
 
 @export_group("Zebra")
 @export_range(0, 8, 1) var ZEBRA_HERDS := 2
 @export_range(1, 15, 1) var ZEBRA_HERD_MIN := 3
-@export_range(1, 15, 1) var ZEBRA_HERD_MAX := 6
+@export_range(1, 15, 1) var ZEBRA_HERD_MAX := 5
 @export_range(3, 30, 0.5) var ZEBRA_SPEED := 17.0
 @export_range(0, 300, 5) var ZEBRA_FOOD := 70.0
-@export_range(0.1, 5, 0.05) var ZEBRA_TOUGHNESS := 1.0
-@export_range(0, 40, 0.5) var ZEBRA_KICK := 10.0
+@export_range(0.1, 5, 0.05) var ZEBRA_POWER := 1.2   ## your strength (plus helpers) vs this decides how hard the grapple is
+@export_range(1, 15, 1) var ZEBRA_GRAB_HITS := 4       ## lurches to match (at even power) to bring it down
+@export_range(0.1, 2, 0.01) var ZEBRA_GRAB_TELL := 0.55   ## warning before each lurch (longer when you're stronger)
+@export_range(2, 4, 2) var ZEBRA_GRAB_DIRS := 4       ## 2 = left/right only, 4 = any direction
+@export_range(0, 1, 0.05) var ZEBRA_GRAB_FAKE := 0.1   ## chance the arrow switches mid-warning
+@export_range(0, 1, 0.05) var ZEBRA_GRAB_DOUBLE := 0.15 ## chance of a second lurch right after one
+@export_range(0, 80, 1) var ZEBRA_GRAB_DAMAGE := 14.0  ## kick/horn damage when you miss a lurch
+@export_range(0, 1, 0.01) var ZEBRA_GRAB_GRIP_LOSS := 0.34 ## grip lost per missed lurch; at 0 you're thrown
+@export_range(0, 1, 0.05) var ZEBRA_INJURY_CHANCE := 0.3 ## chance being thrown off injures you
 @export_range(0.1, 3, 0.05) var ZEBRA_VIGILANCE := 1.0
 @export_range(0, 2, 0.05) var ZEBRA_JINK := 0.7
 
 @export_group("Wildebeest")
 @export_range(0, 8, 1) var WILDEBEEST_HERDS := 1
-@export_range(1, 20, 1) var WILDEBEEST_HERD_MIN := 6
-@export_range(1, 20, 1) var WILDEBEEST_HERD_MAX := 10
+@export_range(1, 20, 1) var WILDEBEEST_HERD_MIN := 5
+@export_range(1, 20, 1) var WILDEBEEST_HERD_MAX := 8
 @export_range(3, 30, 0.5) var WILDEBEEST_SPEED := 16.0
-@export_range(0, 300, 5) var WILDEBEEST_FOOD := 60.0
-@export_range(0.1, 5, 0.05) var WILDEBEEST_TOUGHNESS := 0.9
-@export_range(0, 40, 0.5) var WILDEBEEST_KICK := 6.0
+@export_range(0, 300, 5) var WILDEBEEST_FOOD := 90.0
+@export_range(0.1, 5, 0.05) var WILDEBEEST_POWER := 1.6   ## your strength (plus helpers) vs this decides how hard the grapple is
+@export_range(1, 15, 1) var WILDEBEEST_GRAB_HITS := 5       ## lurches to match (at even power) to bring it down
+@export_range(0.1, 2, 0.01) var WILDEBEEST_GRAB_TELL := 0.45   ## warning before each lurch (longer when you're stronger)
+@export_range(2, 4, 2) var WILDEBEEST_GRAB_DIRS := 4       ## 2 = left/right only, 4 = any direction
+@export_range(0, 1, 0.05) var WILDEBEEST_GRAB_FAKE := 0.3   ## chance the arrow switches mid-warning
+@export_range(0, 1, 0.05) var WILDEBEEST_GRAB_DOUBLE := 0.3 ## chance of a second lurch right after one
+@export_range(0, 80, 1) var WILDEBEEST_GRAB_DAMAGE := 18.0  ## kick/horn damage when you miss a lurch
+@export_range(0, 1, 0.01) var WILDEBEEST_GRAB_GRIP_LOSS := 0.4 ## grip lost per missed lurch; at 0 you're thrown
+@export_range(0, 1, 0.05) var WILDEBEEST_INJURY_CHANCE := 0.5 ## chance being thrown off injures you
 @export_range(0.1, 3, 0.05) var WILDEBEEST_VIGILANCE := 0.9
 @export_range(0, 2, 0.05) var WILDEBEEST_JINK := 0.5
 
@@ -233,9 +295,16 @@ const SAVE_PATH := "user://tuning.cfg"
 @export_range(1, 15, 1) var BUFFALO_HERD_MIN := 4
 @export_range(1, 15, 1) var BUFFALO_HERD_MAX := 6
 @export_range(3, 30, 0.5) var BUFFALO_SPEED := 14.0
-@export_range(0, 400, 5) var BUFFALO_FOOD := 150.0
-@export_range(0.1, 8, 0.05) var BUFFALO_TOUGHNESS := 3.0
-@export_range(0, 60, 0.5) var BUFFALO_KICK := 14.0
+@export_range(0, 400, 5) var BUFFALO_FOOD := 200.0
+@export_range(0.1, 5, 0.05) var BUFFALO_POWER := 2.8   ## your strength (plus helpers) vs this decides how hard the grapple is
+@export_range(1, 15, 1) var BUFFALO_GRAB_HITS := 7       ## lurches to match (at even power) to bring it down
+@export_range(0.1, 2, 0.01) var BUFFALO_GRAB_TELL := 0.38   ## warning before each lurch (longer when you're stronger)
+@export_range(2, 4, 2) var BUFFALO_GRAB_DIRS := 4       ## 2 = left/right only, 4 = any direction
+@export_range(0, 1, 0.05) var BUFFALO_GRAB_FAKE := 0.25   ## chance the arrow switches mid-warning
+@export_range(0, 1, 0.05) var BUFFALO_GRAB_DOUBLE := 0.4 ## chance of a second lurch right after one
+@export_range(0, 80, 1) var BUFFALO_GRAB_DAMAGE := 38.0  ## kick/horn damage when you miss a lurch
+@export_range(0, 1, 0.01) var BUFFALO_GRAB_GRIP_LOSS := 0.5 ## grip lost per missed lurch; at 0 you're thrown
+@export_range(0, 1, 0.05) var BUFFALO_INJURY_CHANCE := 0.9 ## chance being thrown off injures you
 @export_range(0.1, 3, 0.05) var BUFFALO_VIGILANCE := 0.7
 @export_range(0, 2, 0.05) var BUFFALO_JINK := 0.3
 @export_range(0, 1, 0.05) var BUFFALO_DEFEND_CHANCE := 0.5  ## alerted buffalo charge you instead of fleeing

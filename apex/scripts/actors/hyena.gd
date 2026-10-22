@@ -3,10 +3,13 @@ extends CharacterBody3D
 ## Hyenas come for carcasses. They feed if no lion is guarding it; otherwise they
 ## circle and dart in to bite the player ("!" = a bite is coming: swipe or dodge).
 ## A hit or a roar scatters them for a few seconds. Kill one and the rest still come back.
+## Roamers are the local clan: they ROAM, shadowing you at a distance all day, and
+## converge on any kill nearby. Others arrive at a kill and LEAVE when it's gone.
 
-enum HState { APPROACH, CIRCLE, TELL, DART, RETREAT, FEED, SCATTER, LEAVE, DEAD }
+enum HState { APPROACH, CIRCLE, TELL, DART, RETREAT, FEED, SCATTER, LEAVE, DEAD, ROAM }
 
 var hstate := HState.APPROACH
+var roamer := false
 var carcass: Prey
 var player: Lion
 var terrain: Terrain
@@ -82,11 +85,21 @@ func _physics_process(delta: float) -> void:
 			queue_free()
 		return
 	var have_food := is_instance_valid(carcass) and carcass.food_left > 0.0
-	if not have_food and hstate != HState.LEAVE and hstate != HState.SCATTER:
-		_go(HState.LEAVE)
+	if not have_food and hstate not in [HState.LEAVE, HState.SCATTER, HState.ROAM]:
+		carcass = null
+		_go(HState.ROAM if roamer else HState.LEAVE)
 	var guarded := have_food and _guarded()
 
 	match hstate:
+		HState.ROAM:
+			# Keep the lion in sight, at a respectful distance, from our own side.
+			var spot := player.global_position + Vector3(cos(_orbit), 0, sin(_orbit)) * Tuning.HYENA_SHADOW_DIST
+			_orbit += _orbit_dir * delta * 0.05
+			if _flat(spot) > 4.0:
+				_run_to(spot, Tuning.HYENA_SPEED * (0.4 if _flat(spot) < 25.0 else 0.8), delta)
+			else:
+				speed = move_toward(speed, 0.0, 10.0 * delta)
+				_face(player.global_position, 3.0, delta)
 		HState.APPROACH:
 			_run_to(carcass.global_position, Tuning.HYENA_SPEED, delta)
 			var d := _flat(carcass.global_position)
@@ -137,7 +150,10 @@ func _physics_process(delta: float) -> void:
 		HState.SCATTER:
 			_run_away_from(player.global_position, Tuning.HYENA_SPEED, delta)
 			if _t > Tuning.HYENA_SCATTER_TIME:
-				_go(HState.APPROACH if have_food else HState.LEAVE)
+				if have_food:
+					_go(HState.APPROACH)
+				else:
+					_go(HState.ROAM if roamer else HState.LEAVE)
 		HState.LEAVE:
 			_run_away_from(player.global_position, Tuning.HYENA_SPEED * 0.7, delta)
 			if _t > 8.0:
@@ -179,15 +195,35 @@ func _face(p: Vector3, rate: float, delta: float) -> void:
 		heading = lerp_angle(heading, atan2(-to.x, -to.z), 1.0 - exp(-rate * delta))
 
 
+## Turn toward a direction, bent around rocks and trees.
+func _steer(dir: Vector3, rate: float, delta: float) -> void:
+	if terrain:
+		dir = terrain.avoid(global_position, dir, 3.0 + speed * 0.4, 0.5)
+	heading = lerp_angle(heading, atan2(-dir.x, -dir.z), 1.0 - exp(-rate * delta))
+
+
+## Head for a kill (roamers are told when one happens nearby).
+func go_to_carcass(c: Prey) -> void:
+	if hstate == HState.DEAD:
+		return
+	carcass = c
+	_go(HState.APPROACH)
+
+
 func _run_to(p: Vector3, spd: float, delta: float) -> void:
-	_face(p, 7.0, delta)
+	var to := p - global_position
+	to.y = 0
+	if to.length() > 0.05:
+		_steer(to.normalized(), 7.0, delta)
 	var want := spd if _flat(p) > 1.0 else 0.0
 	speed = move_toward(speed, want, 25.0 * delta)
 
 
 func _run_away_from(p: Vector3, spd: float, delta: float) -> void:
 	var away := global_position - p
-	_face(global_position + away, 6.0, delta)
+	away.y = 0
+	if away.length() > 0.05:
+		_steer(away.normalized(), 6.0, delta)
 	speed = move_toward(speed, spd, 25.0 * delta)
 
 

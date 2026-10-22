@@ -199,6 +199,7 @@ func _start_day() -> void:
 	_new_wind()
 	_clear_actors()
 	_spawn_herds()
+	_spawn_roamers()
 	var cd := GameState.challenge_day()
 	if GameState.day < cd:
 		GameState.act = GameState.Act.NOMAD
@@ -229,7 +230,9 @@ func _end_day() -> void:
 	var report: Array[String] = []
 	if GameState.hunger <= 0.0:
 		report.append("You went to sleep starving.")
-	if GameState.act == GameState.Act.PRIDE and GameState.lionesses > 0:
+	# The pride's daily meal only counts on days you led it from the start.
+	if GameState.act == GameState.Act.PRIDE and GameState.lionesses > 0 \
+			and GameState.day > GameState.pride_since_day:
 		if GameState.pride_food < Tuning.PRIDE_FOOD_NEED:
 			GameState.lionesses -= 1
 			report.append("The pride went hungry (%d / %d food). A lioness left." % [
@@ -244,6 +247,7 @@ func _end_day() -> void:
 func _on_trait_chosen(trait_id: String) -> void:
 	GameState.traits.append(trait_id)
 	GameState.day += 1
+	GameState.injured = false   # a night's sleep heals the limp
 	GameState.phase = GameState.Phase.HUNTING
 	hud.hide_overlays()
 	player.wake()
@@ -345,8 +349,13 @@ func _spawn_following_lionesses() -> void:
 
 
 func _send_challengers() -> void:
-	GameState.message.emit("Dusk. Challengers have come for your pride!")
 	var n := Tuning.CHALLENGER_COUNT
+	if GameState.lionesses > 0 and GameState.pride_food >= Tuning.PRIDE_FOOD_NEED and n > 1:
+		# A well-fed pride stands with you.
+		n -= 1
+		GameState.message.emit("Dusk. Challengers come, but your well-fed lionesses drive one off!")
+	else:
+		GameState.message.emit("Dusk. Challengers have come for your pride!")
 	for i in n:
 		var a := rng.randf() * TAU
 		var at := player.global_position + Vector3(cos(a), 0, sin(a)) * 32.0
@@ -371,6 +380,7 @@ func _on_rival_yielded(r: Rival) -> void:
 			(l as Lioness).join()
 			n += 1
 		GameState.lionesses = n
+		GameState.pride_since_day = GameState.day
 		GameState.message.emit("The pride is yours.")
 		# If this was the dusk fight, give it a moment to sink in before night falls.
 		GameState.day_time = minf(GameState.day_time, Tuning.DAY_LENGTH - 3.0)
@@ -435,6 +445,11 @@ func _spawn_herds() -> void:
 
 
 func _on_carcass(c: Prey) -> void:
+	# The clan was watching: roamers nearby head straight for it.
+	for n in get_tree().get_nodes_in_group("hyena"):
+		var h := n as Hyena
+		if h and h.roamer and h.carcass == null and h.global_position.distance_to(c.global_position) < Tuning.HYENA_NOTICE_RANGE:
+			h.go_to_carcass(c)
 	if rng.randf() > Tuning.HYENA_CHANCE:
 		return
 	var n := Tuning.HYENA_BASE + int(Tuning.HYENA_PER_DAY * (GameState.day - 1))
@@ -444,6 +459,28 @@ func _on_carcass(c: Prey) -> void:
 	var cid := c.get_instance_id()
 	get_tree().create_timer(Tuning.HYENA_ARRIVE_DELAY, false).timeout.connect(
 		func(): _spawn_hyenas(instance_from_id(cid) as Prey, n))
+
+
+## The day's clan: they shadow you from a distance and come for anything you kill.
+func _spawn_roamers() -> void:
+	var n := Tuning.HYENA_ROAMERS + int(Tuning.HYENA_ROAMERS_PER_DAY * (GameState.day - 1))
+	if n <= 0:
+		return
+	var a := rng.randf() * TAU
+	for i in n:
+		var h := Hyena.new()
+		h.roamer = true
+		h.hstate = Hyena.HState.ROAM
+		h.player = player
+		h.terrain = terrain
+		h.pack_size = n
+		h.process_mode = Node.PROCESS_MODE_PAUSABLE
+		add_child(h)
+		var p := player.global_position + Vector3(cos(a + i * 0.4), 0, sin(a + i * 0.4)) * 60.0
+		p.x = clampf(p.x, -Tuning.WORLD_SIZE * 0.42, Tuning.WORLD_SIZE * 0.42)
+		p.z = clampf(p.z, -Tuning.WORLD_SIZE * 0.42, Tuning.WORLD_SIZE * 0.42)
+		h.global_position = Vector3(p.x, terrain.height_at(p.x, p.z) + 0.4, p.z)
+		h._orbit = a + i * 0.4
 
 
 func _spawn_hyenas(c: Prey, n: int) -> void:
@@ -528,6 +565,7 @@ func _build_den() -> void:
 		col.shape = sh
 		col.position = mi.position
 		body.add_child(col)
+		terrain.obstacles.append(Vector3(p.x, p.z, sh.radius))
 	den_label = Label3D.new()
 	den_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	den_label.no_depth_test = true

@@ -4,7 +4,8 @@ extends SceneTree
 ## changing the fighting values in Tuning.
 ##
 ## The bot plays like a decent human: it needs REACTION_TIME to respond to a tell,
-## then dodges REACT_CHANCE of the time; it swipes in range and sometimes pounces.
+## then dodges REACT_CHANCE of the time; it swipes in range and sometimes pounces into
+## a clinch. In a clinch it reads the arrows the same way (away from red bites).
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/fight_sim.gd
 
@@ -24,6 +25,12 @@ var _r: Node
 var _reacted_to := -1
 var _tell_seen := -1
 var _tell_t := 0.0
+var _seen_ex := -1
+var _seen_t := 0.0
+var _commit := Vector2.ZERO
+var _commit_dir := Vector2.ZERO
+var _clinches := 0
+var _was_clinch := false
 var _rng := RandomNumberGenerator.new()
 var _wins := 0
 var _time_sum := 0.0
@@ -81,8 +88,10 @@ func _physics_process(delta: float) -> bool:
 		_run += 1
 		if _run >= RUNS:
 			var sc = scenarios[_scenario]
-			_log.append("%-18s -> won %d/%d  avg %.1fs  avg health left %d%%" % [
-				sc[0], _wins, RUNS, _time_sum / maxf(1.0, _wins), int(100.0 * _hp_sum / maxf(1.0, _wins))])
+			_log.append("%-18s -> won %d/%d  avg %.1fs  avg health left %d%%  clinches/fight %.1f" % [
+				sc[0], _wins, RUNS, _time_sum / maxf(1.0, _wins), int(100.0 * _hp_sum / maxf(1.0, _wins)),
+				float(_clinches) / RUNS])
+			_clinches = 0
 			_run = 0
 			_wins = 0
 			_time_sum = 0.0
@@ -98,10 +107,19 @@ func _physics_process(delta: float) -> bool:
 
 
 func _bot(p) -> void:
-	for a in ["swipe", "dodge", "pounce", "move_forward", "move_left", "move_right"]:
+	for a in ["swipe", "dodge", "move_forward", "move_back", "move_left", "move_right"]:
 		Input.action_release(a)
 	if not is_instance_valid(_r) or p.is_dead:
 		return
+	var clinching: bool = p.state == p.State.CLINCH
+	if clinching and not _was_clinch:
+		_clinches += 1
+	_was_clinch = clinching
+	if clinching:
+		Input.action_press("pounce")
+		_clinch_bot(p)
+		return
+	Input.action_release("pounce")
 	var to: Vector3 = _r.global_position - p.global_position
 	to.y = 0
 	var d := to.length()
@@ -127,13 +145,43 @@ func _bot(p) -> void:
 		return
 	if d > 5.5:
 		Input.action_press("move_forward")
-		if d < 7.0 and p._pounce_cd <= 0.0 and _rng.randf() < 0.05:
-			p._start_pounce()
+		if d < 7.0 and p._pounce_cd <= 0.0 and p.pounces >= 1.0 and _rng.randf() < 0.05:
+			Input.action_press("pounce")
+			p.try_pounce()
 	elif d < TU.SWIPE_RANGE + 0.3 and p._swipe_cd <= 0.0:
 		p.heading = atan2(-to.x, -to.z)
 		p._start_swipe()
 	elif d >= TU.SWIPE_RANGE + 0.3:
 		Input.action_press("move_forward")
+
+
+## Inside a clinch: read each arrow late and not always right, like grapple_sim.
+func _clinch_bot(p) -> void:
+	var g = p.grapple
+	if g == null:
+		return
+	if g.phase == 0:
+		_commit = Vector2.ZERO
+		return
+	if g.exchanges != _seen_ex:
+		_seen_ex = g.exchanges
+		_seen_t = 0.0
+		_commit = Vector2.ZERO
+		_commit_dir = Vector2.ZERO
+	_seen_t += 1.0 / 60.0
+	if _commit_dir != g.dir and _seen_t >= REACTION_TIME:
+		_commit_dir = g.dir
+		_seen_t = 0.0
+		var want: Vector2 = -g.dir if g.is_bite else g.dir
+		_commit = want if _rng.randf() < REACT_CHANCE else Vector2.ZERO
+	if _commit.x < -0.5:
+		Input.action_press("move_left")
+	elif _commit.x > 0.5:
+		Input.action_press("move_right")
+	elif _commit.y < -0.5:
+		Input.action_press("move_forward")
+	elif _commit.y > 0.5:
+		Input.action_press("move_back")
 
 
 func _setup() -> void:
@@ -153,6 +201,11 @@ func _setup() -> void:
 	p.health = p.health_max()
 	p.state = 0
 	p.speed = 0.0
+	p.grapple = null
+	p.clinch_rival = null
+	p.pounces = TU.POUNCE_STOCK
+	GS.injured = false
+	_seen_ex = -1
 	var terrain = _main.terrain
 	var at := Vector3(0, 0, -20)
 	p.global_position = Vector3(at.x, terrain.height_at(at.x, at.z) + 0.5, at.z)

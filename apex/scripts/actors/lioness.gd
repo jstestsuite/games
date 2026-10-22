@@ -60,7 +60,7 @@ func _physics_process(delta: float) -> void:
 		LState.DEN:
 			speed = move_toward(speed, 0.0, 6.0 * delta)
 			if global_position.distance_to(den) > 6.0:
-				face_towards(den, 3.0, delta)
+				steer_towards(den, 3.0, delta)
 				speed = Tuning.WALK_SPEED * 0.7
 		LState.FOLLOW:
 			_follow(delta)
@@ -100,7 +100,7 @@ func _follow(delta: float) -> void:
 	to.y = 0
 	var d := to.length()
 	if d > 1.5:
-		face_towards(spot, 5.0, delta)
+		steer_towards(spot, 5.0, delta)
 		var want := Tuning.WALK_SPEED * clampf(d / 4.0, 0.3, 1.3)
 		if stalking:
 			# Creep when in position; slink up faster (still low) when behind.
@@ -159,7 +159,7 @@ func _hunt(delta: float) -> void:
 		return
 	# Run to where it will be, not where it is.
 	var lead := target.global_position + target.velocity * clampf(d / maxf(speed, 5.0), 0.0, 1.2)
-	face_towards(lead, 7.0, delta)
+	steer_towards(lead, 7.0, delta)
 	var want := Tuning.LIONESS_RUN_SPEED
 	if _charge_left > 0.0:
 		_charge_left -= delta
@@ -216,7 +216,7 @@ func _eat(delta: float) -> void:
 		return
 	var d := flat_dist(target)
 	if d > 2.2:
-		face_towards(target.global_position, 6.0, delta)
+		steer_towards(target.global_position, 6.0, delta)
 		speed = move_toward(speed, Tuning.WALK_SPEED, 10.0 * delta)
 		return
 	speed = 0.0
