@@ -196,3 +196,7 @@ All four of you want to:
 - **A fresh run in reserve:** Justin will know the game too well. Keep one fresh full run in reserve (after a few days away), and freeze the scope two builds before the reveal.
 - **Taste check:** before tuning difficulty, an hour of Dead Cells or Mewgenics.
 - **A polish build before the reveal:** audio, juice, and a first 2 minutes that teach themselves.
+
+## Justin's response to session 2
+- **The level select is a debug tool only.** For example, an empty room with a slow zebra to try the catch, or a room with a waiting boss. It is not a player-facing practice mode. So the boss has to be learnable inside the game itself.
+- **The node map is rejected for now.** Justin: the panel is "drafting something that seems a lot like Slay the Spire... this type of gameplay doesn't really fit in a game like that. I want to make sure we aren't copying a game and putting in extra features, but are actually making something unique." The run shape is open again. Decide it after Justin has felt the ride (builds 1–2 don't depend on it).

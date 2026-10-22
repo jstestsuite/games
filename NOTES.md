@@ -42,6 +42,7 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | The level select is a **debug tool** (e.g. a slow zebra in an empty room, a waiting boss), not a player mode. The node map is **rejected**: don't copy another game's structure; make something unique. The run shape is open again, to be decided after the ride is felt | Justin |
 | 2026-10-22 | **Proposed by the panel (session 2), awaiting Justin:**<br>- a node map of small hunt arenas<br>- the pride male reachable at any time<br>- growth by body, not a menu, held behind a toggle until Justin says yes<br>- the build order: Ride Room + level select, then Species Trials, then a thin run spine | Brother's library (Diceomancer, Drop Duchy, Dead Cells, Mewgenics, Satisfactory, Caves of Qud) says build-craft and decisions matter. See `design-panel-2026-10-22.md` |
 | 2026-10-22 | Each run is self-contained, with no roguelike traits. Level select with test rooms for each feature. Don't ask the brother anything: the plan is to wow him | Justin |
 | 2026-10-22 | Justin isn't committed to the lion idea. Scrapping it and starting over is fine if a better idea comes up | Justin, after the v3 playtest |
