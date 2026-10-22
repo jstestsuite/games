@@ -10,7 +10,7 @@ You are a young male lion, driven out of the pride you were born in. One run is 
 2. **Challenge** (day 3): fight the pride's male for his pride. **Lose and the run is over.**
 3. **Pride** (day 4): hunt with your lionesses and feed them. At dusk, challengers come for you. Beat them and you win.
 
-Every hunt is a small tactical puzzle (wind, cover, herd vigilance, a short burst of speed), then a **grapple**: a wrestling minigame where you hold on and match the animal's lurches. Between days you pick an instinct (trait), so each run plays differently.
+Every hunt is a small tactical puzzle (wind, cover, herd vigilance, a short burst of speed), then a **ride**: you land on the animal and stay on as it runs and cuts, reading its body for the next turn. Between days you pick an instinct (trait), so each run plays differently.
 
 **Goal for this project:** a game the developer's brother finds fun and worth playing. He likes hard games, so the default tuning is hard and fair: losing should always feel like your mistake.
 
@@ -18,10 +18,10 @@ Target feeling: **tense patience, an explosive release, then a struggle.** Thirt
 
 ## Pillars
 
-1. **The stalk is a puzzle, the chase is a skill test, the grapple is the payoff.** The grapple is the part the first playtest liked; it's the heart of the game.
-2. **Readable systems.** Wind, cover, prey awareness, every lurch and every attack have a visible cue (compass, `?` / `!` markers, the grapple arrow, `!` / `!!` attack warnings, the risk label). Losing should feel fair.
+1. **The ride is the heart of the game.** Staying on a panicking animal is the skill to learn; the stalk and chase set it up. (A physical skill under pressure is the one thing every playtest has liked.)
+2. **Readable systems, read from the world.** Wind, cover, prey awareness and every attack have a visible cue (compass, `?` / `!` markers, `!` / `!!` attack warnings). During a ride the cues are on the animal's body, not on the screen: nothing between you and the animal.
 3. **Pick your fight.** Species are difficulty tiers. A zebra on day 1 is a fair test; a wildebeest is a gamble; a buffalo needs the pride. The risk label tells you before you commit.
-4. **Hunting feeds fighting.** What you eat becomes strength; strength makes every grapple and clinch easier and decides the challenge.
+4. **Hunting feeds fighting.** What you eat becomes strength; strength makes every ride and clinch easier and decides the challenge.
 
 ## Core loop (implemented)
 
@@ -32,36 +32,63 @@ Target feeling: **tense patience, an explosive release, then a struggle.** Thirt
 - **Pounce** (Space / A): a lunge with slight homing. You have **2 pounces in reserve** (pips in the charge ring); each takes 3 s to come back. **A miss leaves you sprawled** for a moment.
 - **Risk label:** the animal you're facing shows **EASY / FAIR / RISKY / DEADLY**. It's your power (strength plus nearby lionesses) against the species' power.
 
-### The grapple (takedown)
-- When a pounce lands, time slows for a moment and the camera swings in close. **Hold pounce** to stay on.
-- The animal **lurches**. Before each one, an arrow flashes on screen and the animal leans that way. **Push the stick (or WASD) with the arrow** before the short window closes.
-  - **Match it:** the takedown bar fills.
-  - **Miss it:** you lose **grip** and take a kick or horn.
-  - **Grip hits zero:** you're **thrown off**, staggered, and maybe **injured** (a weaker, slower charge until you sleep).
-- Some species **fake** (the arrow switches mid-warning) or **double** (a second lurch right after one).
-- **Strength** gives longer warnings, smaller grip losses and faster progress. **Each lioness holding on** adds power and steady progress.
+### The ride (takedown)
+Built in session 3, from Justin's description: "follow the prey... a catch meter... move in the same direction they move, with a soft magnet type pull." Code: `scripts/actors/ride.gd`.
+- **Landing:** when a pounce lands, time hitches for a moment. The camera swings up and round to look down on the animal from a rear quarter, so its head and front feet show past you (`RIDE_CAM_PITCH`, `RIDE_CAM_SIDE`, `RIDE_CAM_DISTANCE`). The game then runs a little slower (`RIDE_TIME_SCALE`) while you ride.
+- **The animal runs and cuts.** Every second or two it cuts hard to one side. Big animals sometimes **shake** instead.
+- **Its body warns you, in order:**
+  1. the **head swings** and the **shoulder drops** toward the cut;
+  2. a **foot plants**, with a puff of dust, just before it goes.
+  Some species swing the head the wrong way first; **the planted foot never lies**. A shake is announced by the head tossing.
+- **Two feels to compare** (`RIDE_MODEL` in F1):
+  - **BALANCE** (default): a cut flings you to the outside of the turn. Push the stick to keep your weight over its back. In practice: push toward the cut.
+  - **STEER:** point the stick where it's going.
+- **Momentum and the magnet:** either way a soft pull (`RIDE_MAGNET`) draws you back to centre, and your weight has momentum. Overcorrect and you swing past. Experts lean into a cut before it comes.
+- **Catch meter = its fight.** It drains while you're in the **safe zone**. At empty, it goes down.
+- **Grip.** Outside the safe zone your grip drains. At zero (or at the very edge) you're **thrown**: hurt, staggered, maybe injured.
+- **Clamp** (RT, analogue; Shift or left-click): it tires faster, but the safe zone shrinks. The idea: clamp on the straights, ease off before a cut.
+- **Let go** (B / right-click) at any time. It runs off still as tired as you left it (and slower for it), so you can bail before a bad moment and pounce again.
+- **Help and strength:** each lioness holding on tires it faster and makes it slower. Your power against its power softens the throws.
+- **The HUD** (kept small, at the bottom):
+  - its fight, your balance (with the safe zone) and your grip;
+  - `RIDE_SHOW_BALANCE` off hides the balance bar, to test riding by feel alone.
+
+### Practice rooms (debug tool)
+The title menu has the full game, plus a practice room per animal (including a **slow zebra**).
+- **The room:** one animal near you; no day, hunger or hyenas.
+- **Retry:** a fresh animal after each ride, or at once with roar (Y / Q). R or Back returns to the menu.
+- **The log:** each ride's result, time, % of the time you were steady, and your **reaction**: average seconds from each cut to your counter. Negative means you read it before it came; that number should fall as you get better.
 
 ### Prey tiers
 
-| Prey | Food | Power | The grapple | Who should try it |
+| Prey | Food | Power | The ride | Who should try it |
 |---|---|---|---|---|
-| Warthog | 30 | 0.6 | 2 directions, slow warnings, weak hits | Always safe. A snack. |
-| Zebra | 70 | 1.2 | 4 directions, kicks, the odd fake | Day 1 with good timing |
-| Wildebeest | 90 | 1.6 | Faster, more fakes and doubles, horns | A gamble on day 1, fair by day 2 |
-| Buffalo | 200 | 2.8 | Fast, brutal hits; alerted buffalo also **charge you** | Near-suicide alone, easy with the pride |
+| Warthog | 30 | 0.6 | Short, gentle cuts, long warnings, light | Always safe. A snack. |
+| Zebra | 70 | 1.2 | Quick, sharp cuts; **doubles straight back** often | Day 1, if you read the tells |
+| Wildebeest | 90 | 1.6 | Huge cuts (nearly reverses), heavy; the head sometimes lies; the odd shake | A gamble on day 1, fair by day 2 |
+| Buffalo | 200 | 2.8 | Heavy throws, a long ride; **the head lies half the time**; shakes; alerted buffalo also **charge you** | Near-suicide alone, easy with the pride |
 
 About 20% of animals are **young or old**: smaller, slower, less food.
 
-Tuning reference (bot with 0.28 s reaction time that reads 80% of arrows right, `tests/grapple_sim.gd`):
+Tuning reference (`tests/ride_sim.gd`, BALANCE feel, 200 rides each).
+- **The bots:**
+  - **reactive:** only corrects once it's off balance, with a 0.28 s reaction time;
+  - **reader:** also reads the head and the planted foot, and leans in early;
+  - **perfect:** no delay, and knows every cut.
+- **What to look for:** the gap between reactive and reader is the skill to learn.
 
-| Matchup | Bot wins | Health lost |
-|---|---|---|
-| Warthog, day 1 | ~100% | ~1% |
-| Zebra, day 1 (strength 1.0) | ~90% | ~20% |
-| Wildebeest, day 1 | ~50% | ~45%, often injured |
-| Wildebeest, day 2 (strength 1.4) | ~85% | ~25% |
-| Buffalo, solo (1.6) | ~25% | ~80%, usually injured |
-| Buffalo, with 3 lionesses | ~100% | ~12% |
+| Matchup | Reactive | Reader | Perfect |
+|---|---|---|---|
+| Slow zebra (practice) | 100% | 100% | 100% |
+| Warthog, day 1 | 100% | 100% | 100% |
+| Zebra, day 1 (strength 1.0) | ~35% | ~100% | 100% |
+| Zebra, day 2 (1.4) | ~95% | 100% | 100% |
+| Wildebeest, day 1 | ~1% | ~20% | 100% |
+| Wildebeest, day 2 | ~25% | ~75% | 100% |
+| Buffalo, solo (1.4) | ~2% | ~30% | 100% |
+| Buffalo, with 3 lionesses | 100% | 100% | 100% |
+
+In STEER, the reading bot doesn't beat the reactive one. That means my bot hasn't found the technique there, not that there isn't one (the perfect bot still wins everything). Only a human playtest can say whether STEER has a skill to learn. See `tests/results/ride_sim.txt`.
 
 Chases (`tests/hunt_sim.gd`, a heads-up adult zebra) land a pounce from 12 m almost always, rarely from 20 m or more. Young animals can be run down from further.
 
@@ -115,53 +142,49 @@ Tuning reference (`tests/fight_sim.gd`, 20 fights each; the bot dodges 70% of wa
 - Every number is in `scripts/autoload/tuning.gd`, and the **F1 panel** edits them live in game.
   - Save keeps your changes for next time.
   - "Copy changes" puts only the values you changed on the clipboard, ready to paste to Claude.
-- Each species has its own grapple block: `POWER`, `GRAB_HITS`, `GRAB_TELL`, `GRAB_DIRS`, `GRAB_FAKE`, `GRAB_DOUBLE`, `GRAB_DAMAGE`, `GRAB_GRIP_LOSS`, `INJURY_CHANCE`. The clinch has its own group.
+- The ride's feel is the **Ride (prey)** group (model, magnet, damping, push, fling, safe zone, clamp, camera, mouse).
+- Each species has a ride block: `POWER`, `RIDE_FIGHT`, `CUT_MIN` / `CUT_MAX`, `CUT_ANGLE`, `CUT_RATE`, `TELL`, `FAKE`, `DOUBLE`, `SHAKE`, `HEAVY`, `THROW_DAMAGE`, `INJURY_CHANCE`. The clinch has its own group.
 - The probes report how things play out after a change:
   - `tests/hunt_sim.gd`: chases;
-  - `tests/grapple_sim.gd`: grapples by species, strength and helpers;
+  - `tests/ride_sim.gd`: rides by species, strength, helpers and feel, for three bots;
   - `tests/fight_sim.gd`: lion fights.
 
-## Status (end of session 2, 2026-10-22)
+## Status (session 3, 2026-10-22)
 
-**Second version, built from the first playtest:**
-- the grapple minigame and species tiers;
-- clinches;
-- the pounce reserve;
-- a 4-day run;
-- the hyena clan;
-- scarcity and gorging;
-- obstacle avoidance;
-- a meat marker on carcasses.
+**Build 1 of the ride:**
+- **Built:** the ride replaces the arrow grapple for every prey takedown, in the full game too. There's also a debug title menu with practice rooms.
+- **Not changed, on purpose** (one change per build): the rest of v3 (days, hyenas, traits, the rival brawl and clinch). The design panel proposes cutting most of that; see `../design-panel-2026-10-22.md`.
 
 **Verified by tests:**
-- the whole loop (smoke test);
-- the hunt, grapple and fight probes;
-- screenshots of the grapple and clinch HUD.
+- the whole loop, with a ride (smoke test);
+- the practice rooms (practice test);
+- a bot riding through a pride day (soak);
+- the ride probe (skill gap, above);
+- screenshots of the ride and the menu.
 
 **Not yet verified, because no human has played it:**
-- whether the grapple stays fun past the first few;
-- whether the arrow is readable while the camera shakes;
-- whether 0.3 s windows feel fair on a controller.
+- whether staying on is fun at ride 20;
+- whether the body cues read at speed;
+- BALANCE vs STEER;
+- whether the mouse works for riding;
+- whether the slower game speed while riding helps or drags.
 
 **Known gaps and rough edges:**
-- No audio. Primitive placeholder art.
-- The lurch "lean" is a simple body tilt.
-- Grapple directions are screen-relative, which is right while the camera is locked, but untested with real players.
-- No lock-on outside clinches.
-- Obstacle avoidance is simple steering, not pathfinding. Tight clusters of rocks can still snag animals; a stuck animal turns 90° to escape.
-- All lionesses chase the same animal.
-- Cubs are decoration.
+- No audio. Primitive placeholder art. The cues are a head swing, a body tilt and a dust puff on primitive meshes.
+- The lion hangs off the animal's rump; there's no real mounting animation.
+- Contact angle doesn't matter yet (every ride starts centred, at full grip).
+- Rival lions still use the v3 brawl and the arrow clinch.
+- Hyenas, traits and the day structure are still v3's.
+- Obstacle avoidance is simple steering. A ridden animal bends round trees and away from the rim between cuts, and picks its cut side toward open ground.
 - The F1 panel needs a mouse.
-- A single valley.
-- The pride food check only matters if `PRIDE_DAYS` > 1. With the default 4-day run it pays off as one fewer challenger.
-- The balance numbers come from bots. The first playtest of v1 showed bots miss exploits (pounce spam), so expect surprises.
 
 See `PLAYTEST.md` for the feedback so far and what to watch for next.
 
 ## Next milestones (suggested order)
 
-1. **Playtest the grapple.** Is it still fun on the tenth animal? Are the tiers right? Does the clinch feel different enough from prey? Then tune.
-2. **Audio:** wind, grass rustle, footfalls by speed, a heartbeat when close, roars, a fight sting. A huge part of feel.
+1. **Playtest the ride** in the practice rooms, then the full game. Is ride 20 still fun? Do the cues read? BALANCE or STEER? Then tune.
+2. **The rival as a ride** (mirrored, plus at most one authored move), with a practice room.
+3. **Audio:** wind, grass rustle, footfalls by speed, a heartbeat when close, roars, a fight sting. A huge part of feel.
 3. **Real art pass:** swap the primitive rigs for CC0 animated models behind the same `animate()` API. Lions first.
 4. **Territory map:** choose where to hunt each morning (plains, riverbank, hyena country, drought valley).
 5. **Rule-changing traits** (e.g. ambush from cover always staggers, scavenger steals from hyenas).
@@ -182,7 +205,8 @@ See `PLAYTEST.md` for the feedback so far and what to watch for next.
 ## Open questions
 
 - Should losing a nomad fight end the run too, or only the challenge? (Today any death ends it; nomad fights can be escaped.)
-- Should the grapple directions be fixed to the animal (left = its left) instead of the screen?
+- BALANCE or STEER? Or a mix: steer with the stick, balance with the clamp?
+- Should the contact angle (landing from behind at speed vs head-on) set your starting grip?
 - Is gorging a good use for surplus food, or should you be able to drag and stash a carcass?
 - Is two challengers in a row at the end the right finale, or should they come together?
 - How much should the lionesses carry you? Today a good stalk with them is very strong.

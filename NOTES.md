@@ -26,7 +26,8 @@ This is our working guess. Confirm or correct it after he plays.
 |---|---|---|---|
 | APEX v1: cheetah | `apex/` at commit `aac0794` (`git checkout aac0794 -- apex` to restore) | Superseded | Cheetah survives a 5-day season: stalk, sprint, pounce. Traits each night. |
 | APEX v2: lion | `apex/` at commit `4149fac` | Played once: "needs a lot of work". Only the hold-to-grip takedown was fun | Young lion: hunt to grow strong, win a pride, hold it through the last dusk. |
-| APEX v3: lion + grapple | `apex/` (current, `039dc8a`) | Played once: "we went backwards". The arrow quiz isn't the "follow the prey" the developer asked for, the lion fight wasn't understood, and the hyenas added nothing | v2 rebuilt around a grapple minigame for every kill and lion fight, prey as difficulty tiers, real danger, scarcity, a hyena clan. |
+| APEX v3: lion + grapple | `apex/` at `039dc8a` | Played once: "we went backwards". The arrow quiz isn't the "follow the prey" the developer asked for, the lion fight wasn't understood, and the hyenas added nothing | v2 rebuilt around a grapple minigame for every kill and lion fight, prey as difficulty tiers, real danger, scarcity, a hyena clan. |
+| APEX v4: the ride, build 1 | `apex/` (current) | Built in session 3. Not yet played | The panel's next step: the arrow grapple is replaced by a **ride** (stay on a running, cutting animal; read its body; magnet, momentum, clamp, let go), plus a debug title menu with practice rooms. The rest is still v3. |
 
 Feedback on v1: the stamina bar never fully emptied and didn't seem necessary given the cooldown, and the game didn't clearly fit a roguelike. That led to the lion pivot.
 
@@ -42,6 +43,8 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | **Build 1 = the ride + debug practice rooms.** Restated in thumbs terms, and Justin confirmed it. BALANCE and STEER feels are both on an F1 toggle; nothing else in v3 changed | Justin: "the thumb check passes" |
+| 2026-10-22 | Body growth (what you eat changes your body) **is on hold** until the loop is solid | Justin: "focus on the gameplay loop before we start adding things like that"; Claude agreed |
 | 2026-10-22 | The level select is a **debug tool** (e.g. a slow zebra in an empty room, a waiting boss), not a player mode. The node map is **rejected**: don't copy another game's structure; make something unique. The run shape is open again, to be decided after the ride is felt | Justin |
 | 2026-10-22 | **Proposed by the panel (session 2), awaiting Justin:**<br>- a node map of small hunt arenas<br>- the pride male reachable at any time<br>- growth by body, not a menu, held behind a toggle until Justin says yes<br>- the build order: Ride Room + level select, then Species Trials, then a thin run spine | Brother's library (Diceomancer, Drop Duchy, Dead Cells, Mewgenics, Satisfactory, Caves of Qud) says build-craft and decisions matter. See `design-panel-2026-10-22.md` |
 | 2026-10-22 | Each run is self-contained, with no roguelike traits. Level select with test rooms for each feature. Don't ask the brother anything: the plan is to wow him | Justin |
@@ -124,6 +127,7 @@ These came from the first brainstorm and haven't been built.
 
 - **Install Godot first:** run `tools/get_godot.sh`. A fresh cloud container doesn't have it.
 - **Run every check:** `tools/run_tests.sh <draft>` (add `--probes` for the balance probes, `--shots` for screenshots). GitHub runs the checks on every push.
+- **Before building anything Justin described,** restate what the thumbs will do in one sentence and get a yes. Twice now, an idea got translated into a system with on-screen prompts, and it missed.
 - **Probe results are committed** in `<draft>/tests/results/`. Each file is stamped with the date, commit and any tuning overrides. `git log -p` on that folder is the balance history.
 - **Screenshots without a display:** use `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --fixed-fps 30 -s tests/screenshot.gd`.
   - It's slow: about 1 minute per shot with software rendering, so give it a 10-minute timeout.

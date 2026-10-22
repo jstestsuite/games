@@ -18,7 +18,20 @@ F1 changes:
 Ideas:
 ```
 
-## What to watch for in the grapple playtest (v3, session 2)
+## What to try in the ride build (session 3)
+
+Start in **Practice: slow zebra** (title menu, W/S or stick, then A/Enter). Then try zebra, then the full game.
+- **Ride 1 vs ride 20.** Is staying on still fun? Watch the log's **reaction** number: it should fall, and go negative once you're reading cuts before they come.
+- **The cues.** Can you see the head swing, the shoulder drop and the dust from the planted foot in time? Try a buffalo: its head lies half the time, but the foot never does.
+- **BALANCE vs STEER.** F1, then `RIDE_MODEL`: 0 = keep your weight over its back (default), 1 = point the stick where it's going. Which feels like what you pictured?
+- **Clamp (RT) and let go (B).** Do they create decisions, or get ignored?
+- **The magnet.** `RIDE_MAGNET` higher is easier; lower makes you swing more. `RIDE_DAMPING` lower gives more overshoot.
+- **Slow-down while riding.** `RIDE_TIME_SCALE` (0.8). Better at 1.0 or lower?
+- **Mouse.** If your brother may play on mouse and keyboard: can you ride with the mouse? `RIDE_MOUSE_SENS`.
+- **Feel it without the bar.** Set `RIDE_SHOW_BALANCE` off. Can you ride by watching the animal alone?
+- **Not changed yet, on purpose:** hyenas, traits, days and the rival fight are still v3's. Judge only the ride for now.
+
+## What to watch for in the grapple playtest (v3, session 2, done)
 
 - **The grapple:** still fun on the tenth animal? Can you read the arrow in time on a controller? Do fake-outs feel fair or cheap?
 - **Tiers:** is a day-1 zebra a fair test, a day-1 wildebeest a real gamble, and a solo buffalo clearly a bad idea? Did the risk label help you choose?

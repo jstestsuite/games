@@ -14,14 +14,15 @@ Read `DESIGN.md` first for what the game is and where it's headed (its Status se
 
 ```
 scripts/
-  main.gd               game flow: days, acts (NOMAD/CHALLENGE/PRIDE), spawning, den, hyenas, win/lose, sun and sky
+  main.gd               game flow: title menu and practice rooms, days, acts (NOMAD/CHALLENGE/PRIDE), spawning, den, hyenas, win/lose, sun and sky
   autoload/tuning.gd    every gameplay number (exported vars), save/load of F1 overrides
   autoload/game_state.gd  run state (act, day, hunger, strength, pride food), traits, input map, signals
   world/terrain.gd      procedural ground, grass, trees, rocks, bounds; height_at(), is_in_tall_grass()
   actors/animal_rig.gd  primitive-mesh animal with procedural gait; animate(), plus paw/lunge poses and a mane
   actors/big_cat.gd     shared lion body: health, strength scaling, take_hit(), movement on terrain
-  actors/lion.gd        the player (MOVE/POUNCE/SPRAWL/TAKEDOWN/CLINCH/EATING/SWIPE/DODGE/STAGGER/DOWN) and camera
-  actors/grapple.gd     the struggle minigame (lurch tells, grip/progress for prey, balance for clinches)
+  actors/lion.gd        the player (MOVE/POUNCE/SPRAWL/RIDE/CLINCH/EATING/SWIPE/DODGE/STAGGER/DOWN) and camera
+  actors/ride.gd        the takedown: riding a running animal (cuts, body tells, balance/steer, fight, grip); no scene needed
+  actors/grapple.gd     the rival clinch (arrow tells, balance tug-of-war)
   actors/rival.gd       rival males: IDLE/STANDOFF/FIGHT/YIELD with telegraphed attacks; clinched = held by the player
   actors/lioness.gd     pride AI: DEN/FOLLOW/HUNT/HOLD/EAT/LEAVE
   actors/prey.gd        prey AI for every species (GRAZE/ALERT/FLEE/DEFEND/GRABBED/DEAD), carcass food
@@ -41,7 +42,7 @@ Groups: `player`, `hunter` (things prey fear: player + lionesses), `enemy` (thin
 
 ## How to verify changes
 
-**One command:** from the repo root, `tools/run_tests.sh apex` runs the import plus the smoke, input and soak tests. It takes about 3 minutes and prints `RESULT: PASS` or `FAIL`. Add `--probes` to run the tuning probes too; they save their results to `tests/results/*.txt`. Commit those, so `git log -p apex/tests/results/` shows how balance moved. GitHub runs the same checks on every push (`.github/workflows/tests.yml`).
+**One command:** from the repo root, `tools/run_tests.sh apex` runs the import plus the smoke, input, practice and soak tests. It takes about 3 minutes and prints `RESULT: PASS` or `FAIL`. Add `--probes` to run the tuning probes too; they save their results to `tests/results/*.txt`. Commit those, so `git log -p apex/tests/results/` shows how balance moved. GitHub runs the same checks on every push (`.github/workflows/tests.yml`).
 
 Individual scripts (Godot must be on PATH as `godot`):
 
@@ -51,7 +52,8 @@ godot --headless --path . --fixed-fps 60 -s tests/smoke_test.gd  # a whole life 
 godot --headless --path . -s tests/input_test.gd                  # every action on keyboard AND controller; INPUT TEST: PASS
 godot --headless --path . --fixed-fps 60 -s tests/soak_test.gd    # bot plays 2 min of a pride day; catches stuck/escaped animals, idle AI
 godot --headless --path . --fixed-fps 60 -s tests/hunt_sim.gd     # tuning probe: chases per species and distance
-godot --headless --path . --fixed-fps 60 -s tests/grapple_sim.gd  # tuning probe: grapples by species, strength, helpers
+godot --headless --path . -s tests/ride_sim.gd                    # tuning probe: rides by species/strength/feel for reactive, reader and perfect bots
+godot --headless --path . --fixed-fps 60 -s tests/practice_test.gd # practice rooms: spawn, ride, throw, log, respawn; PRACTICE TEST: PASS
 godot --headless --path . --fixed-fps 60 -s tests/fight_sim.gd    # tuning probe: fight win rates by strength match-up
 godot --path . --fixed-fps 30 -s tests/screenshot.gd              # renders screenshots/ (needs a display)
 ```
@@ -65,7 +67,9 @@ godot --path . --fixed-fps 30 -s tests/screenshot.gd              # renders scre
 - In `-s` test scripts, autoloads are not compile-time globals: use `root.get_node("GameState")` and avoid static types from `class_name` scripts.
 - Probes must hold `GameState.day_time` below `DAY_LENGTH` and reset the phase between runs, or night falls / game over disables controls mid-probe.
 - Bots miss exploits humans find (v1's pounce spam). When a probe looks too easy or too hard, also ask "what would a player spam?"
-- Grapple/clinch bots: react after a reaction time, right REACT_CHANCE of the time, re-read after a fake-out, and release the stick between lurches.
+- Clinch bots: react after a reaction time, right REACT_CHANCE of the time, re-read after a fake-out, and release the stick between lurches.
+- Ride bots (`ride_sim.gd`) drive a bare `Ride` with no scene, so they're fast and deterministic. The number that matters is the gap between the reactive and reader bots: that's the skill to learn. Slow-mo timers run on real time, so a headless test that waits for something in a ride should wait for the event (e.g. `ride.cuts >= 1`), not a fixed number of frames.
+- `Ride` and anything else using `Tuning` can't be `preload`ed by a `-s` test script (autoloads don't exist yet at compile time): `load()` it at runtime.
 - No display? `xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --fixed-fps 30 -s tests/screenshot.gd` works but is slow (several minutes).
 
 ## Conventions
