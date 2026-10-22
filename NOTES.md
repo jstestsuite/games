@@ -26,13 +26,15 @@ This is our working guess. Confirm or correct it after he plays.
 |---|---|---|---|
 | APEX v1: cheetah | `apex/` at commit `aac0794` (`git checkout aac0794 -- apex` to restore) | Superseded | Cheetah survives a 5-day season: stalk, sprint, pounce. Traits each night. |
 | APEX v2: lion | `apex/` at commit `4149fac` | Played once: "needs a lot of work". Only the hold-to-grip takedown was fun | Young lion: hunt to grow strong, win a pride, hold it through the last dusk. |
-| APEX v3: lion + grapple | `apex/` (current) | Built in session 2. Not yet played by a human | v2 rebuilt around the part that was fun: a grapple minigame for every kill and lion fight, prey as difficulty tiers, real danger, scarcity, a hyena clan. |
+| APEX v3: lion + grapple | `apex/` (current, `039dc8a`) | Played once: "we went backwards". The arrow quiz isn't the "follow the prey" the developer asked for, the lion fight wasn't understood, and the hyenas added nothing | v2 rebuilt around a grapple minigame for every kill and lion fight, prey as difficulty tiers, real danger, scarcity, a hyena clan. |
 
 Feedback on v1: the stamina bar never fully emptied and didn't seem necessary given the cooldown, and the game didn't clearly fit a roguelike. That led to the lion pivot.
 
 Feedback on v2: repetitive and simple. You could chase down and pounce-spam anything, food was plentiful, there was no danger from animals, hyenas did nothing, and prey snagged on rocks. The one fun part was learning the hold-A takedown. That led to v3. Details are in `apex/PLAYTEST.md`.
 
-**Lesson so far:** the fun shows up where there's a skill to learn under pressure (the grapple), not in systems that run themselves. Build depth into the moment-to-moment verbs before adding more systems.
+Feedback on v3: the developer wanted continuous tracking ("follow the prey" with a catch meter and a soft magnet), not an arrow quiz. They didn't get the lion fight, and the hyenas added nothing. They paused all changes to ask what the game is missing. A four-agent design panel answered: the idea is fine, but the verb and the process are wrong. Its proposal is a greybox "ride" test room next. See `design-panel-2026-10-22.md`. **This is awaiting the developer's call.**
+
+**Lesson so far:** the fun shows up where there's a skill to learn under pressure (the grapple), not in systems that run themselves. Build depth into the moment-to-moment verbs before adding more systems. Also: build what the developer described, in their terms (feel, not a system with a HUD prompt), and change one thing per build so each can be judged.
 
 ## Decision log
 
@@ -40,6 +42,7 @@ Newest first. Say who decided, so later sessions know what's settled and what's 
 
 | Date | Decision | Who / why |
 |---|---|---|
+| 2026-10-22 | **On hold:** no game changes until we agree on what's missing. A design panel proposed a greybox "ride" test room, cutting most of v3's systems, and asking the brother 5 questions first | Developer paused after the v3 playtest. The proposal is in `design-panel-2026-10-22.md`, not yet accepted |
 | 2026-10-22 | At most 2 hyenas wind up or dart at once; the clan grows by 0.5 per day, not 1 | The soak test showed 7 hyenas biting together killed a strong lion in ~25 s: unreadable, not hard-but-fair |
 | 2026-10-22 | Test kit: soak test, input test, saved probe results, `tools/run_tests.sh`, GitHub check on push | Developer: "anything useful for future development" |
 | 2026-10-22 | **v3: every kill and lion fight is a grapple minigame**: hold pounce and push the stick with each telegraphed lurch, with a slow-mo zoom on the grab | Developer liked the idea ("a possible winner"), building on the one fun part of v2 |

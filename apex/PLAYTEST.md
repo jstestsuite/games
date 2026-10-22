@@ -43,6 +43,13 @@ These are the open risks. Each one is a guess until someone plays.
 
 ## Entries
 
+### 2026-10-22 · developer · lion v3 (`039dc8a`), controller
+Verdict: "I think we went backwards here." No changes until we figure out what the game is lacking.
+- **Prey capture**, in the developer's words: "I was thinking more like you just have to follow the prey. So maybe the game slows down and there is a catch meter and it goes down while you are on the animal. To stay on, you have to move in the same direction they move, with maybe a soft magnet type pull or something to make it doable." v3 built a reaction quiz (arrow, flick, pass or fail) instead of continuous tracking.
+- **Lion fight:** "I didn't really get how the lion fight was supposed to work." Only tried twice.
+- **Hyenas:** "don't really add anything... need a complete redesign or to be scrapped. I end up just killing them then eating."
+- Outcome: a design panel of four Claude subagents. Read `../design-panel-2026-10-22.md` for what it proposes (a greybox "ride" test room next).
+
 ### 2026-10-22 · developer · lion v2 (`daaa9fb`), controller
 Verdict: "needs a lot of work, wouldn't call it super fun." Learning the hold-A takedown was fun the first couple of times. After that it was repetitive and simple.
 - Prey sometimes get stuck running in circles.
