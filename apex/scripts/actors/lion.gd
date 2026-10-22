@@ -4,13 +4,14 @@ extends BigCat
 ## pounce (Space; you have a couple in reserve, they recharge), swipe (LMB / F), dodge (RMB / Alt), roar (Q), eat (E).
 ## Animals don't strafe: you steer a heading, and at speed you turn wide.
 ##
-## A pounce that lands on prey starts a TAKEDOWN grapple; on a rival lion, a CLINCH.
-## Both are a Grapple (see grapple.gd): hold the pounce button to stay on, and push the
-## stick with each lurch the arrow warns of (away from a red bite in a clinch).
+## A pounce that lands on prey starts a RIDE (see ride.gd): stay on as it runs and cuts,
+## clamp with RT, let go with B. On a rival lion it starts a CLINCH (see grapple.gd): hold
+## pounce, and push the stick with each lurch the arrow warns of (away from a red bite).
 
 signal roared(at: Vector3, radius: float)
+signal ride_ended(info: Dictionary)   # species, result (down / thrown / let go), time, steady, react, cuts
 
-enum State { MOVE, POUNCE, SPRAWL, TAKEDOWN, CLINCH, EATING, SWIPE, DODGE, STAGGER, DOWN }
+enum State { MOVE, POUNCE, SPRAWL, RIDE, CLINCH, EATING, SWIPE, DODGE, STAGGER, DOWN }
 
 var state := State.MOVE
 var charge := 0.0             # seconds of burst left in the tank
@@ -27,6 +28,8 @@ var last_hurt_by := ""
 var grab_target: Prey
 var clinch_rival: Rival
 var grapple: Grapple
+var ride: Ride
+var practice := false        # practice room: no eating after a kill
 var eat_target: Prey
 
 var _sprint_t := 0.0
@@ -45,6 +48,7 @@ var _cam_yaw := 0.0
 var _cam_pitch := -0.22
 var _grab_cam_yaw := 0.0
 var _trauma := 0.0
+var _mouse_stick := Vector2.ZERO   # riding with the mouse: a lean that drifts back to centre
 var _rng := RandomNumberGenerator.new()
 
 var cam_pivot: Node3D
@@ -86,7 +90,7 @@ func max_charge() -> float:
 
 
 func in_grapple() -> bool:
-	return state == State.TAKEDOWN or state == State.CLINCH
+	return state == State.RIDE or state == State.CLINCH
 
 
 ## Fresh start for a new day: full charge, not winded, standing.
@@ -101,6 +105,9 @@ func wake() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if state == State.RIDE and event is InputEventMouseMotion:
+		_mouse_stick = (_mouse_stick + event.relative * Tuning.RIDE_MOUSE_SENS).limit_length(1.0)
+		return
 	if in_grapple():
 		return   # the camera is locked while you wrestle
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -115,6 +122,7 @@ func _physics_process(delta: float) -> void:
 	_dodge_cd = maxf(0.0, _dodge_cd - delta)
 	roar_cd = maxf(0.0, roar_cd - delta)
 	winded_t = maxf(0.0, winded_t - delta)
+	_mouse_stick *= exp(-Tuning.RIDE_MOUSE_RETURN * delta)
 	_state_t += delta
 	if state != State.MOVE:
 		sprinting = false
@@ -131,8 +139,8 @@ func _physics_process(delta: float) -> void:
 			speed = move_toward(speed, 0.0, 40.0 * delta)
 			if _state_t > Tuning.POUNCE_MISS_TIME:
 				_set_state(State.MOVE)
-		State.TAKEDOWN:
-			_takedown(delta)
+		State.RIDE:
+			_ride(delta)
 		State.CLINCH:
 			_clinch(delta)
 		State.EATING:
@@ -293,7 +301,7 @@ func _pounce(delta: float) -> void:
 		face_towards(target.global_position, Tuning.POUNCE_HOMING, delta)
 	var prey := _find_prey(Tuning.POUNCE_CATCH_RADIUS)
 	if prey and prey.grab(self):
-		_start_takedown(prey)
+		_start_ride(prey)
 		return
 	for e in targets_in_arc("enemy", Tuning.POUNCE_CATCH_RADIUS, 100.0):
 		if e is Rival:
@@ -384,82 +392,115 @@ func _show_risk() -> void:
 		best.show_risk(lab[0], lab[1])
 
 
-func _start_takedown(prey: Prey) -> void:
+func _start_ride(prey: Prey) -> void:
 	grab_target = prey
-	grapple = Grapple.new()
-	grapple.setup_prey(prey, prey_power(prey))
-	_set_state(State.TAKEDOWN)
-	_grab_cam_yaw = heading
+	ride = Ride.new()
+	ride.setup(prey.p, prey_power(prey) / maxf(0.05, prey.p("POWER")), prey.heading, prey.ride_fight,
+			prey.practice_slow, terrain)
+	_mouse_stick = Vector2.ZERO
+	_set_state(State.RIDE)
+	_grab_cam_yaw = prey.heading + Tuning.RIDE_CAM_SIDE
 	_trauma = 0.5
 	_slowmo()
 
 
-func _takedown(delta: float) -> void:
-	if not is_instance_valid(grab_target) or grab_target.is_dead:
-		_end_grapple()
+func _ride(delta: float) -> void:
+	var prey := grab_target
+	if not is_instance_valid(prey) or prey.is_dead or prey.state != Prey.State.GRABBED \
+			or not prey.grabbers.has(self):
+		_end_ride()
 		_set_state(State.MOVE)
 		return
-	if grab_target.state != Prey.State.GRABBED or not grab_target.grabbers.has(self):
-		_end_grapple()
-		_set_state(State.MOVE)
-		return
-	if controls_enabled and not Input.is_action_pressed("pounce"):
-		# Let go: it bolts.
-		grab_target.release(self)
-		_end_grapple()
+	var pf := prey.forward()
+	var pr := pf.cross(Vector3.UP)
+	if controls_enabled and Input.is_action_just_pressed("dodge"):
+		# Let go: it runs off, still as tired as you left it.
+		_ride_over("let go")
+		knock = pr * (signf(ride.x) if ride.x != 0.0 else 1.0) * Tuning.KNOCKBACK * 0.6
+		prey.release(self)
+		_end_ride()
 		_pounce_cd = Tuning.POUNCE_COOLDOWN
 		_set_state(State.MOVE)
 		GameState.message.emit("You let go.")
 		return
 
-	# Lionesses holding on make it easier.
+	# Lionesses holding on too make it weaker and easier to ride.
 	var helpers := 0
-	for g in grab_target.grabbers:
+	for g in prey.grabbers:
 		if is_instance_valid(g) and g != self and g.is_in_group("lioness"):
 			helpers += 1
-	grapple.assist = helpers * Tuning.LIONESS_GRAB_POWER / maxf(0.05, grab_target.p("POWER"))
-	grapple.assist_progress = helpers * Tuning.LIONESS_HOLD_PROGRESS
+	ride.helpers = helpers
+	ride.ratio = prey_power(prey) / maxf(0.05, prey.p("POWER"))
 
-	var res := grapple.update(delta, _input_vector())
-	# Show the lurch on the animal: it leans during the warning and yanks on the window.
-	var world := _screen_to_world(grapple.dir)
-	grab_target.lean = world * grapple.tell_fraction() if grapple.phase == Grapple.Phase.TELL else Vector3.ZERO
-	if res != 0:
-		grab_target.lurch(world)
-	if res < 0:
-		var r := clampf(grapple.effective_ratio(), 0.5, 2.0)
-		take_beast_hit(grab_target.p("GRAB_DAMAGE") / r, grab_target.global_position, false,
-				grab_target.display_name().to_lower())
-		if is_dead:
-			return
-	elif res > 0:
-		_trauma = maxf(_trauma, 0.2)
+	var c := Input.get_action_raw_strength("clamp") if controls_enabled else 0.0
+	var res := ride.update(delta, _ride_input(), c, prey.global_position)
+	prey.ride_fight = ride.fight
+	prey.heading = ride.heading
+	prey.speed = ride.speed
+	prey.tell_head = ride.head
+	prey.lean = pr * ride.lean
+	if ride.planted_now:
+		prey.dust(ride.side)
 
-	if grapple.progress >= 1.0:
-		var prey := grab_target
-		_end_grapple()
+	if res > 0:
+		_ride_over("down")
+		_end_ride()
 		prey.die()
 		_on_kill(prey)
 		return
-	if grapple.grip <= 0.0:
+	if res < 0:
 		_thrown_off()
 		return
 
-	# Hang on to its flank.
-	var pf := Vector3(-sin(grab_target.heading), 0, -cos(grab_target.heading))
-	var pr := pf.cross(Vector3.UP)
-	var spot := grab_target.global_position + pr * 0.9 + pf * 0.2
-	global_position.x = lerpf(global_position.x, spot.x, 1.0 - exp(-12.0 * delta))
-	global_position.z = lerpf(global_position.z, spot.z, 1.0 - exp(-12.0 * delta))
-	face_towards(grab_target.global_position, 10.0, delta)
+	# Hang on to its back, swung off-centre by how far off balance you are.
+	var spot := prey.global_position - pf * prey.rump() + pr * ride.x * 0.8
+	global_position.x = spot.x
+	global_position.z = spot.z
+	heading = prey.heading
+	if ride.model == Ride.Model.STEER:
+		heading += ride.x * ride.heading_max()
 	speed = 0.0
+	# From a rear quarter, so its head shows past you.
+	var cam_yaw := prey.heading + Tuning.RIDE_CAM_SIDE
+	_grab_cam_yaw = lerp_angle(_grab_cam_yaw, cam_yaw, 1.0 - exp(-Tuning.RIDE_CAM_FOLLOW * delta))
+
+
+## Your push this frame, in the ride's terms (see Ride.update): from the stick, or from
+## the mouse if you're leaning harder with that.
+func _ride_input() -> float:
+	var stick := _input_vector()
+	if _mouse_stick.length() > stick.length():
+		stick = _mouse_stick
+	if stick.length() < 0.15:
+		return 0.0
+	if ride.model == Ride.Model.BALANCE:
+		return clampf(stick.x, -1.0, 1.0)   # left/right on screen = its left/right (the camera's behind it)
+	var world := Vector3(stick.x, 0, stick.y).rotated(Vector3.UP, _cam_yaw)
+	# STEER: push toward where you want to be heading.
+	var want := atan2(-world.x, -world.z)
+	var maxr := ride.heading_max()
+	return clampf(wrapf(want - ride.aim, -PI, PI) / maxr, -1.0, 1.0) * minf(1.0, stick.length())
+
+
+## Report how the ride went (the practice room keeps a log of these).
+func _ride_over(result: String) -> void:
+	if ride == null or not is_instance_valid(grab_target):
+		return
+	ride_ended.emit({"species": grab_target.display_name(), "result": result, "time": ride.age,
+		"steady": ride.steady_fraction(), "react": ride.mean_react(), "cuts": ride.cuts})
 
 
 func _thrown_off() -> void:
 	var prey := grab_target
+	_ride_over("thrown")
+	var side := signf(ride.x) if ride.x != 0.0 else 1.0
+	var r := clampf(ride.ratio, 0.5, 2.0)
 	prey.release(self)
-	_end_grapple()
-	knock = (global_position - prey.global_position).normalized() * Tuning.KNOCKBACK * 1.6
+	_end_ride()
+	knock = prey.forward().cross(Vector3.UP) * side * Tuning.KNOCKBACK * 1.6
+	take_beast_hit(prey.p("THROW_DAMAGE") / r, prey.global_position, false, prey.display_name().to_lower())
+	if is_dead:
+		return
 	_stagger(Tuning.STAGGER_TIME * 1.6)
 	_trauma = 0.8
 	if _rng.randf() < prey.p("INJURY_CHANCE"):
@@ -469,31 +510,35 @@ func _thrown_off() -> void:
 		GameState.message.emit("Thrown off!")
 
 
-func _end_grapple() -> void:
+func _end_ride() -> void:
 	if is_instance_valid(grab_target):
 		grab_target.lean = Vector3.ZERO
+		grab_target.tell_head = 0.0
 	grab_target = null
+	ride = null
+	Engine.time_scale = 1.0
+
+
+func _end_grapple() -> void:
 	grapple = null
 	clinch_rival = null
-
-
-## Arrow directions are on screen; this is where they point on the ground.
-func _screen_to_world(d: Vector2) -> Vector3:
-	return Vector3(d.x, 0, d.y).rotated(Vector3.UP, _grab_cam_yaw)
 
 
 func _on_kill(prey: Prey) -> void:
 	GameState.register_kill(prey.display_name())
 	_trauma = 0.7
 	_hitstop()
-	_start_eating(prey)
+	if practice:
+		_set_state(State.MOVE)
+	else:
+		_start_eating(prey)
 
 
 func _hitstop() -> void:
 	# A tiny freeze sells the impact.
 	Engine.time_scale = 0.05
 	get_tree().create_timer(Tuning.HITSTOP_TIME, true, false, true).timeout.connect(
-		func(): Engine.time_scale = 1.0)
+		func(): Engine.time_scale = _time_scale_now())
 
 
 ## The moment you latch on: time slows while the camera swings in.
@@ -502,7 +547,12 @@ func _slowmo() -> void:
 		return
 	Engine.time_scale = Tuning.GRAB_SLOWMO_SCALE
 	get_tree().create_timer(Tuning.GRAB_SLOWMO_TIME, true, false, true).timeout.connect(
-		func(): Engine.time_scale = 1.0)
+		func(): Engine.time_scale = _time_scale_now())
+
+
+## The game runs a little slower while you ride.
+func _time_scale_now() -> float:
+	return Tuning.RIDE_TIME_SCALE if state == State.RIDE else 1.0
 
 
 # --- clinch with a rival ---------------------------------------------------------
@@ -736,11 +786,13 @@ func _on_hit(damage: float, heavy: bool) -> void:
 		# Kicks during a takedown are part of the struggle; a heavy hit from elsewhere breaks it.
 		if not heavy:
 			return
-		if state == State.TAKEDOWN and is_instance_valid(grab_target):
+		if state == State.RIDE and is_instance_valid(grab_target):
+			_ride_over("knocked off")
 			grab_target.release(self)
+			_end_ride()
 		elif state == State.CLINCH and is_instance_valid(clinch_rival):
 			clinch_rival.exit_clinch(false)
-		_end_grapple()
+			_end_grapple()
 	if heavy and state != State.DOWN:
 		_stagger(Tuning.STAGGER_TIME * 1.5)
 
@@ -751,6 +803,7 @@ func _on_health_gone() -> void:
 		grab_target.release(self)
 	if is_instance_valid(clinch_rival):
 		clinch_rival.exit_clinch(true)
+	_end_ride()
 	_end_grapple()
 	_set_state(State.DOWN)
 
@@ -760,7 +813,7 @@ func get_posture() -> float:
 	match state:
 		State.EATING:
 			return Tuning.POSTURE_WALK * 0.6
-		State.POUNCE, State.TAKEDOWN, State.CLINCH, State.SPRAWL:
+		State.POUNCE, State.RIDE, State.CLINCH, State.SPRAWL:
 			return Tuning.POSTURE_SPRINT
 		State.SWIPE, State.DODGE, State.STAGGER:
 			return Tuning.POSTURE_WALK * 2.0
@@ -785,7 +838,7 @@ func _update_rig(delta: float) -> void:
 		State.EATING:
 			crouch = 0.6
 			head_down = 1.0
-		State.TAKEDOWN:
+		State.RIDE:
 			crouch = 0.4
 			head_down = 0.5
 			rig.lunge = 0.6
@@ -806,6 +859,11 @@ func _update_rig(delta: float) -> void:
 			crouch = 1.0
 			head_down = 1.0
 	_pose_rig(delta, speed_norm, crouch, head_down)
+	# Up on its back while riding, hanging off to one side as you lose balance.
+	var on_back := state == State.RIDE and is_instance_valid(grab_target)
+	rig.position = Vector3(0, grab_target.back_height() * 0.55, 0) if on_back else Vector3.ZERO
+	if state == State.RIDE and ride:
+		rig.rotate_object_local(Vector3.FORWARD, ride.x * 0.6)
 	if state == State.DOWN:
 		rig.rotate_object_local(Vector3.FORWARD, minf(_state_t * 3.0, 1.4))
 
@@ -815,8 +873,14 @@ func _update_camera(delta: float) -> void:
 	if grappling:
 		# Swing in close behind your shoulder and hold still while you wrestle.
 		_cam_yaw = lerp_angle(_cam_yaw, _grab_cam_yaw, 1.0 - exp(-8.0 * delta))
-		_cam_pitch = lerpf(_cam_pitch, -0.32, 1.0 - exp(-6.0 * delta))
-	var target := global_position + Vector3(0, Tuning.CAM_HEIGHT * (0.75 if stalking or grappling else 1.0), 0)
+		var pitch := Tuning.RIDE_CAM_PITCH if state == State.RIDE else -0.32
+		_cam_pitch = lerpf(_cam_pitch, pitch, 1.0 - exp(-6.0 * delta))
+	var height := Tuning.CAM_HEIGHT * (0.75 if stalking or grappling else 1.0)
+	var target := global_position + Vector3(0, height, 0)
+	if state == State.RIDE and is_instance_valid(grab_target):
+		# Frame the animal, not you: its head and feet carry the tells.
+		target = grab_target.global_position + grab_target.forward() * 0.5 \
+				+ Vector3(0, grab_target.back_height() + 0.3, 0)
 	cam_pivot.global_position = cam_pivot.global_position.lerp(target, 1.0 - exp(-14.0 * delta))
 	cam_pivot.rotation = Vector3(_cam_pitch, _cam_yaw, 0)
 	var speed_t := clampf(speed / Tuning.CHARGE_SPEED, 0.0, 1.0)
@@ -824,7 +888,7 @@ func _update_camera(delta: float) -> void:
 	var dist := Tuning.CAM_DISTANCE * (1.0 + speed_t * 0.25)
 	if grappling:
 		fov_target = Tuning.FOV_BASE - 6.0
-		dist = Tuning.GRAB_CAM_DISTANCE
+		dist = Tuning.RIDE_CAM_DISTANCE if state == State.RIDE else Tuning.GRAB_CAM_DISTANCE
 	camera.fov = lerpf(camera.fov, fov_target, 1.0 - exp(-4.0 * delta))
 	spring.spring_length = lerpf(spring.spring_length, dist, 1.0 - exp(-(8.0 if grappling else 3.0) * delta))
 

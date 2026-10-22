@@ -1,0 +1,29 @@
+# ride_sim
+date:   2026-10-22 21:19:29
+commit: 3eb4dc3 (with uncommitted changes)
+tuning: defaults from tuning.gd
+
+== BALANCE (stay over its back)
+                       reactive                     reader                       perfect                     
+slow zebra, day 1      100%   9.3s  steady 94%      100%  10.5s  steady 83%      100%   8.8s  steady 100%    
+warthog, day 1         100%   3.1s  steady 100%     100%   3.3s  steady 95%      100%   3.1s  steady 100%    
+zebra, day 1            38%  12.9s  steady 67%       99%  10.9s  steady 81%      100%   8.9s  steady 98%     
+zebra, day 2            97%  10.3s  steady 72%      100%   8.3s  steady 90%      100%   7.4s  steady 100%    
+wildebeest, day 1        2%  17.4s  steady 82%       21%  17.2s  steady 74%      100%  14.3s  steady 89%     
+wildebeest, day 2       28%  14.2s  steady 74%       73%  13.5s  steady 78%      100%  11.1s  steady 97%     
+buffalo, solo            2%  34.7s  steady 76%       33%  34.3s  steady 73%      100%  26.8s  steady 95%     
+buffalo, 3 lionesses   100%   6.8s  steady 96%      100%   6.8s  steady 97%      100%   6.5s  steady 100%    
+
+== STEER (steer with it)
+                       reactive                     reader                       perfect                     
+slow zebra, day 1      100%  11.8s  steady 74%      100%  10.2s  steady 86%      100%   8.8s  steady 100%    
+warthog, day 1         100%   3.1s  steady 100%     100%   3.1s  steady 100%     100%   3.1s  steady 100%    
+zebra, day 1            25%  12.7s  steady 73%        8%  12.2s  steady 79%      100%   9.4s  steady 93%     
+zebra, day 2            77%  10.3s  steady 73%       25%   9.9s  steady 79%      100%   7.8s  steady 96%     
+wildebeest, day 1       11%  18.9s  steady 66%       15%  19.0s  steady 68%      100%  15.0s  steady 84%     
+wildebeest, day 2       30%  15.4s  steady 71%       34%  15.0s  steady 73%      100%  11.6s  steady 93%     
+buffalo, solo           42%  34.2s  steady 75%       43%  34.1s  steady 76%      100%  27.5s  steady 93%     
+buffalo, 3 lionesses   100%   7.7s  steady 85%       97%   7.8s  steady 84%      100%   6.7s  steady 97%     
+
+win % · average seconds to bring it down (game time) · % of the ride spent in the safe zone
+200 rides per cell. Reaction 0.28 s real (x RIDE_TIME_SCALE 0.80 in game time).

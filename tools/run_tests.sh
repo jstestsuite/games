@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs a draft's checks. Fails (exit 1) on any FAIL, script error or parse error.
 #
-#   tools/run_tests.sh               # apex: smoke, input and soak tests (~5 min)
+#   tools/run_tests.sh               # apex: smoke, input, practice and soak tests (~5 min)
 #   tools/run_tests.sh apex --probes # also the tuning probes; results saved to tests/results/
 #   tools/run_tests.sh apex --shots  # also render screenshots (needs xvfb-run; slow)
 #
@@ -48,11 +48,12 @@ run() {
 godot --headless --path "$draft" --import >/dev/null 2>&1
 run "smoke test" tests/smoke_test.gd "SMOKE TEST: PASS" --fixed-fps 60
 run "input test" tests/input_test.gd "INPUT TEST: PASS"
+run "practice test" tests/practice_test.gd "PRACTICE TEST: PASS" --fixed-fps 60
 run "soak test" tests/soak_test.gd "SOAK TEST: PASS" --fixed-fps 60
 
 if $probes; then
 	run "hunt probe" tests/hunt_sim.gd "saved" --fixed-fps 60
-	run "grapple probe" tests/grapple_sim.gd "saved" --fixed-fps 60
+	run "ride probe" tests/ride_sim.gd "saved"
 	run "fight probe" tests/fight_sim.gd "saved" --fixed-fps 60
 fi
 

@@ -6,6 +6,16 @@ extends Node3D
 const HUD_SCRIPT := preload("res://scripts/ui/hud.gd")
 const TUNING_PANEL := preload("res://scripts/ui/tuning_panel.gd")
 const SPECIES := ["WARTHOG", "ZEBRA", "WILDEBEEST", "BUFFALO"]
+## The title menu: the full game, then practice rooms (a debug tool: one animal at a
+## time near you, a fresh one after each ride, no day, hunger or hyenas).
+const PRACTICE := [
+	["Full game", ""],
+	["Practice: slow zebra", "ZEBRA_SLOW"],
+	["Practice: zebra", "ZEBRA"],
+	["Practice: warthog", "WARTHOG"],
+	["Practice: wildebeest", "WILDEBEEST"],
+	["Practice: buffalo", "BUFFALO"],
+]
 
 var terrain: Terrain
 var player: Lion
@@ -25,6 +35,10 @@ var cubs: Array[AnimalRig] = []
 var _challengers_sent := false
 var _male_forced := false
 var _title_orbit := 0.0
+var _practice_prey: Prey
+var _practice_wait := 0.0
+var _ride_log: Array[String] = []
+var _rides := 0
 
 
 func _ready() -> void:
@@ -50,6 +64,7 @@ func _ready() -> void:
 	player.controls_enabled = false
 	player.roared.connect(_on_roar)
 	player.died.connect(_on_player_died)
+	player.ride_ended.connect(_on_ride_ended)
 
 	hud = HUD_SCRIPT.new()
 	hud.name = "HUD"
@@ -66,14 +81,22 @@ func _ready() -> void:
 	_new_wind()
 	_spawn_herds()
 	_set_sun(0.15)
-	hud.show_title()
+	hud.show_title(_menu_names(), GameState.menu_index)
 	GameState.phase = GameState.Phase.TITLE
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	match GameState.phase:
 		GameState.Phase.TITLE:
-			if event.is_action_pressed("start") or (event is InputEventMouseButton and event.pressed):
+			var step := 0
+			if event.is_action_pressed("ui_up") or event.is_action_pressed("move_forward"):
+				step = -1
+			elif event.is_action_pressed("ui_down") or event.is_action_pressed("move_back"):
+				step = 1
+			if step != 0:
+				GameState.menu_index = wrapi(GameState.menu_index + step, 0, PRACTICE.size())
+				hud.show_title(_menu_names(), GameState.menu_index)
+			elif event.is_action_pressed("start") or (event is InputEventMouseButton and event.pressed):
 				_start_run()
 		GameState.Phase.GAME_OVER, GameState.Phase.VICTORY:
 			if event.is_action_pressed("restart"):
@@ -85,6 +108,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		GameState.Phase.HUNTING:
 			if event.is_action_pressed("pause"):
 				_toggle_pause()
+			elif event.is_action_pressed("restart") and (get_tree().paused or GameState.practice != ""):
+				_restart()   # back to the menu
 			elif event is InputEventMouseButton and event.pressed and get_tree().paused:
 				_toggle_pause()
 
@@ -102,8 +127,16 @@ func _toggle_pause() -> void:
 	hud.set_paused(p)
 
 
+func _menu_names() -> Array:
+	return PRACTICE.map(func(e): return e[0])
+
+
 func _start_run() -> void:
 	if GameState.phase != GameState.Phase.TITLE:
+		return
+	GameState.practice = PRACTICE[GameState.menu_index][1]
+	if GameState.practice != "":
+		_start_practice()
 		return
 	GameState.new_run()
 	player.strength = GameState.strength
@@ -126,7 +159,10 @@ func _process(delta: float) -> void:
 		GameState.Phase.HUNTING:
 			if get_tree().paused:
 				return
-			_tick_day(delta)
+			if GameState.practice != "":
+				_tick_practice(delta)
+			else:
+				_tick_day(delta)
 
 
 func _tick_day(delta: float) -> void:
@@ -402,6 +438,86 @@ func _victory_if_hunting() -> void:
 		_victory()
 
 
+# --- practice rooms ------------------------------------------------------------------
+
+func _start_practice() -> void:
+	GameState.new_run()
+	GameState.day_time = Tuning.DAY_LENGTH * 0.35
+	_set_sun(0.35)
+	player.practice = true
+	player.strength = GameState.strength
+	player.wake()
+	player.health = player.health_max()
+	hud.hide_overlays()
+	player.controls_enabled = true
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_clear_actors()
+	_ride_log.clear()
+	_rides = 0
+	hud.set_ride_log(_ride_log)
+	_spawn_practice_prey()
+	GameState.message.emit("%s. Chase it down, pounce, and ride it." % PRACTICE[GameState.menu_index][0])
+
+
+func _tick_practice(delta: float) -> void:
+	GameState.hunger = Tuning.HUNGER_MAX
+	GameState.injured = false
+	if player.state == Lion.State.RIDE:
+		return
+	var gone := not is_instance_valid(_practice_prey) or _practice_prey.is_dead \
+			or _practice_prey.global_position.distance_to(player.global_position) > 90.0
+	if not gone:
+		_practice_wait = 1.5
+		return
+	_practice_wait -= delta
+	if _practice_wait <= 0.0:
+		_spawn_practice_prey()
+
+
+## A fresh animal 16 m ahead of you, grazing, facing away. Clears the last one.
+func _spawn_practice_prey() -> void:
+	for group in ["prey", "carcass"]:
+		for node in get_tree().get_nodes_in_group(group):
+			node.queue_free()
+	if player.state == Lion.State.RIDE:
+		return
+	player.health = player.health_max()
+	var key: String = GameState.practice
+	var g := Prey.new()
+	g.species = key.trim_suffix("_SLOW")
+	g.terrain = terrain
+	g.wind = wind
+	g.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(g)
+	g.weak = false
+	g._size = 1.0
+	if key.ends_with("_SLOW"):
+		g.practice_slow = Tuning.PRACTICE_SLOW
+	var fwd := Vector3(-sin(player._cam_yaw), 0, -cos(player._cam_yaw))
+	var at := player.global_position + fwd * 16.0
+	var half := Tuning.WORLD_SIZE * 0.5 - 60.0
+	at.x = clampf(at.x, -half, half)
+	at.z = clampf(at.z, -half, half)
+	g.global_position = Vector3(at.x, terrain.height_at(at.x, at.z) + 0.3, at.z)
+	g.heading = atan2(-fwd.x, -fwd.z)
+	g._wander_target = g.global_position
+	_practice_prey = g
+	_practice_wait = 1.5
+
+
+func _on_ride_ended(info: Dictionary) -> void:
+	_rides += 1
+	var line := "%d. %s %s in %.1f s  ·  steady %d%%  ·  reaction %+.2f s over %d cuts" % [
+		_rides, info.species, info.result, info.time, int(info.steady * 100.0), info.react, info.cuts]
+	print("RIDE ", line)
+	if GameState.practice == "":
+		return
+	_ride_log.push_front(line)
+	if _ride_log.size() > 8:
+		_ride_log.resize(8)
+	hud.set_ride_log(_ride_log)
+
+
 # --- spawning ---------------------------------------------------------------------
 
 func _clear_actors() -> void:
@@ -503,6 +619,9 @@ func _spawn_hyenas(c: Prey, n: int) -> void:
 
 
 func _on_roar(at: Vector3, radius: float) -> void:
+	if GameState.practice != "":
+		_spawn_practice_prey()   # in practice, roar = a fresh animal
+		return
 	GameState.message.emit("ROAR")
 	for n in get_tree().get_nodes_in_group("hyena"):
 		var h := n as Hyena

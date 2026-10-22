@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless smoke test: loads the game and drives a whole life with shortcuts:
-## a takedown and a meal, hyenas, a night, the challenge fight, the pride days and
+## a ride and a meal, hyenas, a night, the challenge fight, the pride days and
 ## the dusk challengers, ending in victory. Fails loudly on broken invariants.
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/smoke_test.gd
@@ -14,6 +14,7 @@ var _step := 0
 var _f := 0       # frames in this step
 var _prey: Node
 var _m_hp := 0.0
+var _ride_from := Vector3.INF
 
 
 func _initialize() -> void:
@@ -49,24 +50,30 @@ func _physics_process(_delta: float) -> bool:
 			_check(p.pounces < before, "pouncing uses one from the reserve")
 			_next()
 		2:
-			if p.state == p.State.TAKEDOWN and p.grapple != null:
-				var g = p.grapple
-				if _f < 400 and g.exchanges == 0:
-					return false   # let the first lurch happen with no input: a miss
-				_check(g.grip < 1.0 and p.health < p.health_max(), "a missed lurch costs grip and a kick")
-				g.progress = 1.0
+			if p.state == p.State.RIDE and p.ride != null:
+				if _f == 1 or _ride_from == Vector3.INF:
+					_ride_from = _prey.global_position
+				p.ride.grip = 1.0   # nobody's steering: don't let it throw us yet
+				if p.ride.cuts < 1 and _f < 900:
+					return false   # wait for its first cut (slow-mo runs on real time, so frames vary)
+				_check(_prey.global_position.distance_to(_ride_from) > 2.0, "the zebra keeps running while you ride it")
+				_check(p.ride.cuts >= 1, "it cuts to throw you")
+				p.ride.fight = 0.0001
+				p.ride.x = 0.0
+				p.ride.xv = 0.0
 				_next()
 			elif _f > 600:
-				_check(false, "pounce starts a takedown grapple")
+				_check(false, "pounce lands and starts a ride (state=%d)" % p.state)
 				_next()
 		3:
 			if _f == 5:
 				Input.action_release("pounce")
-				_check(GS.kills >= 1, "finishing the grapple kills the zebra (kills=%d)" % GS.kills)
+				_check(GS.kills >= 1, "wearing it out brings the zebra down (kills=%d)" % GS.kills)
 				_check(p.state == p.State.EATING, "lion eats after the kill")
 				_next()
 		4:
 			if _f == 60:
+				_check(Engine.time_scale == 1.0, "game speed is back to normal after the ride")
 				_check(GS.strength > TU.STRENGTH_START, "eating builds strength (%.3f)" % GS.strength)
 				var c = get_nodes_in_group("carcass")[0]
 				var before := get_nodes_in_group("hyena").size()

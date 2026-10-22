@@ -1,5 +1,5 @@
 extends SceneTree
-## Soak test: a bot plays two minutes of a pride day (stalk, charge, pounce, grapple
+## Soak test: a bot plays two minutes of a pride day (stalk, charge, pounce, ride
 ## like a person, eat, fight hyenas) while the test watches the whole world for things
 ## that break quietly: animals leaving the map or going NaN, fleeing prey stuck on rocks
 ## (the v2 "running in circles" bug), lionesses that never hunt, a hyena clan that never
@@ -82,7 +82,10 @@ func _bot(p, delta: float) -> void:
 	for a in ["move_forward", "move_back", "move_left", "move_right", "sprint", "stalk", "swipe", "roar"]:
 		Input.action_release(a)
 	match p.state:
-		p.State.TAKEDOWN, p.State.CLINCH:
+		p.State.RIDE:
+			_ride_bot(p)
+			return
+		p.State.CLINCH:
 			Input.action_press("pounce")
 			_grapple_bot(p, delta)
 			return
@@ -117,6 +120,19 @@ func _bot(p, delta: float) -> void:
 	if d < 4.0 and p._pounce_cd <= 0.0 and p.pounces >= 1.0:
 		Input.action_press("pounce")
 		p.try_pounce()
+
+
+## Keep our weight over its back: push against the drift (assumes the BALANCE feel and a
+## camera behind the animal, so screen-right is its right).
+func _ride_bot(p) -> void:
+	var r = p.ride
+	if r == null:
+		return
+	var u := clampf(-(3.0 * r.x + 0.6 * r.xv), -1.0, 1.0)
+	if u > 0.05:
+		Input.action_press("move_right", u)
+	elif u < -0.05:
+		Input.action_press("move_left", -u)
 
 
 func _grapple_bot(p, delta: float) -> void:

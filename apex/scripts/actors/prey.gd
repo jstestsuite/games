@@ -4,9 +4,10 @@ extends CharacterBody3D
 ## Tuning, looked up by species prefix (e.g. ZEBRA_SPEED).
 ## Senses every hunter (the player and lionesses) by sight and scent, builds an
 ## awareness meter: GRAZE -> ALERT -> FLEE. Buffalo may DEFEND (charge you) instead.
-## When the player grabs it, the struggle is a Grapple run by the lion; this script just
-## thrashes, leans and lurches as told. Grabbed by lionesses alone, it's a simpler
-## contest of power. Dead, it becomes a carcass that lions and hyenas eat from.
+## When the player lands on it, the lion runs a Ride (ride.gd) and steers this animal:
+## this script just runs where it's told and shows the tells (head swing, shoulder drop,
+## dust from the planted foot). Grabbed by lionesses alone, it's a simpler contest of
+## power. Dead, it becomes a carcass that lions and hyenas eat from.
 
 signal became_carcass(prey: Prey)
 
@@ -31,7 +32,10 @@ var killed_by_pride := false
 var weak := false                  # young or old: smaller and slower
 var grabbers: Array[Node3D] = []
 var takedown := 0.0                # 0..1, lionesses-only takedowns
-var lean := Vector3.ZERO           # set by the grappling lion: which way it's about to lurch
+var lean := Vector3.ZERO           # set by the riding lion: shoulder drop toward a coming cut
+var tell_head := 0.0               # set by the riding lion: head swing, -1 its left .. +1 its right
+var ride_fight := 1.0              # what's left of its fight after a ride (it stays tired if you let go)
+var practice_slow := 1.0           # the practice room's slow zebra: speed and cuts x this
 
 var _grazing := true
 var _graze_timer := 0.0
@@ -46,8 +50,8 @@ var _defend_target: Node3D
 var _defend_t := 0.0
 var _defend_rolled := false
 var _carcass_t := 0.0
-var _lurch := Vector3.ZERO
 var _stuck_t := 0.0
+var _unstick_t := 0.0              # after turning off a wall, hold that heading this long
 var _edge_side := 0.0              # which way we slide along the rim; kept until we're clear
 var _risk_t := 0.0
 var _floor_normal := Vector3.UP
@@ -57,6 +61,7 @@ var _height := 1.5
 var rig: AnimalRig
 var marker: Label3D
 var risk_tag: Label3D
+var _dust: CPUParticles3D
 
 
 ## Tuning value for this species, e.g. p("SPEED") -> Tuning.ZEBRA_SPEED.
@@ -158,9 +163,8 @@ func _physics_process(delta: float) -> void:
 	_think(delta)
 
 	var fwd := Vector3(-sin(heading), 0, -cos(heading))
-	velocity.x = fwd.x * speed + _lurch.x
-	velocity.z = fwd.z * speed + _lurch.z
-	_lurch = _lurch.move_toward(Vector3.ZERO, 25.0 * delta)
+	velocity.x = fwd.x * speed
+	velocity.z = fwd.z * speed
 	if not is_on_floor():
 		velocity.y -= 30.0 * delta
 	else:
@@ -248,6 +252,9 @@ func _nearest_hunter() -> Node3D:
 
 ## Turn toward `dir`, bent around rocks and trees.
 func _steer(dir: Vector3, rate: float, delta: float) -> void:
+	if _unstick_t > 0.0:
+		_unstick_t -= delta
+		return
 	if terrain:
 		dir = terrain.avoid(global_position, dir, 3.0 + speed * 0.4)
 	heading = lerp_angle(heading, atan2(-dir.x, -dir.z), 1.0 - exp(-rate * delta))
@@ -268,6 +275,8 @@ func _unstick(delta: float) -> void:
 			var side := 1.0 if Vector3(-sin(heading), 0, -cos(heading)).cross(Vector3.UP).dot(to_mid) < 0.0 else -1.0
 			heading += (PI * 0.5) * side
 			_jink = 0.0
+			# Hold the new heading for a moment; steering straight back would put it on the wall again.
+			_unstick_t = 0.5
 	else:
 		_stuck_t = 0.0
 
@@ -382,7 +391,8 @@ func _flee(delta: float) -> void:
 	var jink := _jink if _edge_side == 0.0 else 0.0
 	_steer(dir.rotated(Vector3.UP, jink), 9.0, delta)
 
-	var top := p("SPEED") * (Tuning.PREY_WEAK_SPEED_MULT if weak else 1.0)
+	var top := p("SPEED") * (Tuning.PREY_WEAK_SPEED_MULT if weak else 1.0) * practice_slow
+	top *= lerpf(0.75, 1.0, ride_fight)   # worn out by a lion that let go
 	if _flee_t > Tuning.TIRE_TIME:
 		top *= Tuning.TIRED_SPEED_MULT
 	speed = move_toward(speed, top, Tuning.PREY_ACCEL * delta)
@@ -483,11 +493,11 @@ func _struggle(delta: float) -> void:
 	if grabbers.is_empty():
 		release(null)
 		return
-	speed = move_toward(speed, Tuning.TAKEDOWN_DRAG_SPEED, 20.0 * delta)
-	heading += sin(Time.get_ticks_msec() * 0.004 + get_instance_id()) * 1.5 * delta
 	for g in grabbers:
 		if g.is_in_group("player"):
-			return   # the lion's Grapple runs this fight
+			return   # the lion's Ride steers it
+	speed = move_toward(speed, Tuning.TAKEDOWN_DRAG_SPEED, 20.0 * delta)
+	heading += sin(Time.get_ticks_msec() * 0.004 + get_instance_id()) * 1.5 * delta
 
 	# Lionesses alone: a plain contest of power.
 	var power := grabbers.size() * Tuning.LIONESS_GRAB_POWER
@@ -509,9 +519,52 @@ func _struggle(delta: float) -> void:
 		die()
 
 
-## A lurch during a grapple: a sudden yank in a world direction.
-func lurch(world_dir: Vector3) -> void:
-	_lurch = world_dir * Tuning.GRAB_LURCH_SPEED
+func forward() -> Vector3:
+	return Vector3(-sin(heading), 0, -cos(heading))
+
+
+## Height of its back above the ground.
+func back_height() -> float:
+	var spec := _spec()
+	return (float(spec.leg_len) + float(spec.body_r) * 1.5) * _size
+
+
+## How far behind its middle a rider hangs on.
+func rump() -> float:
+	return float(_spec().body_len) * 0.45 * _size
+
+
+## A foot planted hard on `side` (+1 its right): a puff of dust, the honest tell of a cut.
+func dust(side: float) -> void:
+	if _dust == null:
+		_dust = CPUParticles3D.new()
+		_dust.one_shot = true
+		_dust.emitting = false
+		_dust.amount = 40
+		_dust.explosiveness = 0.9
+		_dust.direction = Vector3(0, 1, 0)
+		_dust.spread = 60.0
+		_dust.initial_velocity_min = 1.5
+		_dust.initial_velocity_max = 4.0
+		_dust.lifetime = 0.8
+		_dust.gravity = Vector3(0, -3, 0)
+		_dust.scale_amount_min = 0.7
+		_dust.scale_amount_max = 1.4
+		var m := SphereMesh.new()
+		m.radius = 0.22
+		m.height = 0.44
+		m.radial_segments = 6
+		m.rings = 3
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.72, 0.6, 0.42, 0.85)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.material = mat
+		_dust.mesh = m
+		add_child(_dust)
+	var fwd := forward()
+	_dust.global_position = global_position + fwd.cross(Vector3.UP) * side * 0.45 + fwd * float(_spec().body_len) * 0.35
+	_dust.restart()
 
 
 ## Show how risky this animal is to grab (the lion calls this every frame it's targeted).
@@ -583,9 +636,13 @@ func _update_visuals(delta: float) -> void:
 	if state == State.GRABBED:
 		sn = 0.9   # thrashing
 	rig.animate(delta, speed, sn, 0.0, head_down)
+	# Head swing toward a coming cut (the lion sets tell_head while it rides).
+	rig.neck.rotation.y = lerpf(rig.neck.rotation.y, -tell_head * 0.9, 1.0 - exp(-18.0 * delta))
 
 	match state:
-		State.FLEE, State.GRABBED:
+		State.GRABBED:
+			marker.visible = false   # nothing between you and its body while you ride
+		State.FLEE:
 			marker.visible = true
 			marker.text = "!"
 			marker.modulate = Color(1.0, 0.3, 0.2)

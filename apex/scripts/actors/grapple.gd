@@ -1,52 +1,40 @@
 class_name Grapple
 extends RefCounted
-## A close-quarters struggle, shared by prey takedowns and rival clinches.
+## A clinch with a rival lion (prey takedowns are a Ride now; see ride.gd).
 ##
-## The opponent telegraphs a lurch with an arrow (screen directions: left, right,
-## up = away from the camera, down = toward it). When the warning ends you get a short
-## window: push the stick the right way and you win the exchange, push the wrong way or
-## nothing and you lose it. Committing early is fine, but fake-outs switch the arrow
-## partway through the warning.
+## He telegraphs a move with an arrow (screen directions: left, right, up = away from
+## the camera, down = toward it). When the warning ends you get a short window: push the
+## stick the right way and you win the exchange, push the wrong way or nothing and you
+## lose it. Committing early is fine, but fake-outs switch the arrow partway through.
 ##
-## PREY: always push WITH the arrow. Wins fill `progress` (1 = brought down); losses
-##   drain `grip` (0 = thrown off) and cost you a kick.
-## RIVAL: a tug-of-war on `balance` (+1 = you pin him, -1 = he pins you). Yellow arrow =
-##   a shove, push WITH it to brace. Red arrow = a bite, push AWAY from it.
+## A tug-of-war on `balance` (+1 = you pin him, -1 = he pins you). Yellow arrow = a
+## shove, push WITH it to brace. Red arrow = a bite, push AWAY from it.
 ##
 ## This class only keeps score. The lion applies damage, movement and the endings.
 
-enum Kind { PREY, RIVAL }
+enum Kind { RIVAL }
 enum Phase { WAIT, TELL, WINDOW }
 
-const DIRS_2: Array[Vector2] = [Vector2(-1, 0), Vector2(1, 0)]
 const DIRS_4: Array[Vector2] = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
 
-var kind := Kind.PREY
+var kind := Kind.RIVAL
 var phase := Phase.WAIT
 var t := 0.0                  # time in the current phase
-var age := 0.0                # time since the grapple started
+var age := 0.0                # time since the clinch started
 var dir := Vector2.ZERO       # the current arrow, in input space
-var is_bite := false          # rival only
-var grip := 1.0
-var progress := 0.0
+var is_bite := false
 var balance := 0.0
-var ratio := 1.0              # your power / theirs; > 1 makes everything kinder
-var assist := 0.0             # prey: extra power from lionesses holding on
-var assist_progress := 0.0    # prey: passive progress per second from them
+var ratio := 1.0              # your strength / his; > 1 makes everything kinder
 var last_result := 0          # +1 won the last exchange, -1 lost it (for the HUD)
 var result_t := 9.0           # seconds since last_result changed
 var exchanges := 0
 
-# Tuned per opponent by setup_prey / setup_rival.
 var tell_time := 0.5
 var wait_min := 0.35
 var wait_max := 1.0
 var dirs: Array[Vector2] = DIRS_4
 var fake_chance := 0.0
-var double_chance := 0.0
 var bite_chance := 0.0
-var hits := 4
-var grip_loss := 0.3
 
 var _wait := 0.7
 var _tell_len := 0.5
@@ -54,38 +42,16 @@ var _fake_at := -1.0
 var _rng := RandomNumberGenerator.new()
 
 
-func setup_prey(prey: Prey, power: float) -> void:
-	kind = Kind.PREY
-	_rng.randomize()
-	tell_time = prey.p("GRAB_TELL")
-	wait_min = Tuning.GRAB_WAIT_MIN
-	wait_max = Tuning.GRAB_WAIT_MAX
-	dirs = DIRS_2 if int(prey.p("GRAB_DIRS")) <= 2 else DIRS_4
-	fake_chance = prey.p("GRAB_FAKE")
-	double_chance = prey.p("GRAB_DOUBLE")
-	hits = maxi(1, int(prey.p("GRAB_HITS")))
-	grip_loss = prey.p("GRAB_GRIP_LOSS")
-	ratio = power / maxf(0.05, prey.p("POWER"))
-	_wait = Tuning.GRAB_FIRST_WAIT
-
-
 func setup_rival(my_strength: float, his_strength: float, edge: float) -> void:
-	kind = Kind.RIVAL
 	_rng.randomize()
 	tell_time = Tuning.CLINCH_TELL
 	wait_min = Tuning.CLINCH_WAIT_MIN
 	wait_max = Tuning.CLINCH_WAIT_MAX
-	dirs = DIRS_4
 	fake_chance = Tuning.CLINCH_FAKE_CHANCE
 	bite_chance = Tuning.CLINCH_BITE_CHANCE
 	ratio = my_strength / maxf(0.05, his_strength)
 	balance = edge
-	_wait = Tuning.GRAB_FIRST_WAIT * 0.6
-
-
-## The power ratio including helpers: what the warnings and penalties scale with.
-func effective_ratio() -> float:
-	return ratio + assist
+	_wait = Tuning.CLINCH_FIRST_WAIT
 
 
 ## Advance by delta with the player's stick. Returns +1 when an exchange is won,
@@ -97,9 +63,6 @@ func update(delta: float, input: Vector2) -> int:
 	var out := 0
 	match phase:
 		Phase.WAIT:
-			if kind == Kind.PREY:
-				grip = minf(1.0, grip + Tuning.GRAB_GRIP_REGEN * delta)
-				progress += assist_progress * delta
 			if t >= _wait:
 				_start_tell()
 		Phase.TELL:
@@ -113,7 +76,7 @@ func update(delta: float, input: Vector2) -> int:
 				out = _judge(input)
 		Phase.WINDOW:
 			out = _judge(input)
-			if out == 0 and t >= Tuning.GRAB_WINDOW:
+			if out == 0 and t >= Tuning.CLINCH_WINDOW:
 				out = _resolve(false)
 	return out
 
@@ -127,9 +90,9 @@ func _start_tell() -> void:
 	phase = Phase.TELL
 	t = 0.0
 	dir = dirs[_rng.randi() % dirs.size()]
-	is_bite = kind == Kind.RIVAL and _rng.randf() < bite_chance
-	# Stronger than it? You get longer to read it.
-	_tell_len = tell_time * clampf(sqrt(effective_ratio()), 0.75, 1.3)
+	is_bite = _rng.randf() < bite_chance
+	# Stronger than him? You get longer to read it.
+	_tell_len = tell_time * clampf(sqrt(ratio), 0.75, 1.3)
 	_fake_at = -1.0
 	if _rng.randf() < fake_chance:
 		_fake_at = _tell_len * 0.5
@@ -145,21 +108,13 @@ func _judge(input: Vector2) -> int:
 
 func _resolve(won: bool) -> int:
 	exchanges += 1
-	var r := effective_ratio()
-	if kind == Kind.PREY:
-		if won:
-			progress += (1.0 / float(hits)) * clampf(r, 0.6, 1.6)
-			grip = minf(1.0, grip + Tuning.GRAB_SUCCESS_GRIP)
-		else:
-			grip -= grip_loss / clampf(r, 0.5, 2.0)
-	else:
-		# Losing an exchange costs more than winning one gains: only a stronger lion,
-		# or a sharper reader, comes out on top.
-		var rr := clampf(r, 0.6, 1.6)
-		balance += Tuning.CLINCH_SHIFT_WIN * rr if won else -Tuning.CLINCH_SHIFT_LOSE / rr
+	# Losing an exchange costs more than winning one gains: only a stronger lion,
+	# or a sharper reader, comes out on top.
+	var rr := clampf(ratio, 0.6, 1.6)
+	balance += Tuning.CLINCH_SHIFT_WIN * rr if won else -Tuning.CLINCH_SHIFT_LOSE / rr
 	last_result = 1 if won else -1
 	result_t = 0.0
 	phase = Phase.WAIT
 	t = 0.0
-	_wait = 0.12 if (won and _rng.randf() < double_chance) else _rng.randf_range(wait_min, wait_max)
+	_wait = _rng.randf_range(wait_min, wait_max)
 	return last_result

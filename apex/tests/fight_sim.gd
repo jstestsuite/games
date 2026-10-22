@@ -157,7 +157,7 @@ func _bot(p) -> void:
 		Input.action_press("move_forward")
 
 
-## Inside a clinch: read each arrow late and not always right, like grapple_sim.
+## Inside a clinch: read each arrow late and not always right, like a human.
 func _clinch_bot(p) -> void:
 	var g = p.grapple
 	if g == null:

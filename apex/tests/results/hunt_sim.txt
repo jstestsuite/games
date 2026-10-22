@@ -1,17 +1,17 @@
 # hunt_sim
-date:   2026-10-22 19:23:20
-commit: d39c495
+date:   2026-10-22 21:19:03
+commit: 3eb4dc3 (with uncommitted changes)
 tuning: defaults from tuning.gd
 
-stalk 14m       -> FLEE    awareness=1.01  min_dist=7.3
-walk 14m        -> FLEE    awareness=1.30  min_dist=8.1
-walk 30m        -> FLEE    awareness=1.30  min_dist=20.7
+stalk 14m       -> FLEE    awareness=1.02  min_dist=6.9
+walk 14m        -> FLEE    awareness=1.30  min_dist=8.0
+walk 30m        -> FLEE    awareness=1.30  min_dist=21.6
 zebra 12m       -> caught 4/4  avg 2.4s
-zebra 20m       -> caught 0/4  avg 0.0s
-zebra 28m       -> caught 1/4  avg 15.0s
-zebra 40m       -> caught 1/4  avg 17.6s
-young zebra 28m -> caught 4/4  avg 6.8s
-young zebra 40m -> caught 3/4  avg 11.9s
-warthog 20m     -> caught 4/4  avg 2.6s
-wildebeest 20m  -> caught 1/4  avg 11.5s
+zebra 20m       -> caught 3/4  avg 12.1s
+zebra 28m       -> caught 3/4  avg 15.3s
+zebra 40m       -> caught 1/4  avg 15.3s
+young zebra 28m -> caught 4/4  avg 7.2s
+young zebra 40m -> caught 4/4  avg 11.1s
+warthog 20m     -> caught 4/4  avg 2.7s
+wildebeest 20m  -> caught 2/4  avg 11.9s
 buffalo 15m     -> caught 4/4  avg 2.2s

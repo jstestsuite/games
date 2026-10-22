@@ -7,7 +7,7 @@ extends SceneTree
 
 # Actions that must work on both keyboard and controller.
 const BOTH := ["move_forward", "move_back", "move_left", "move_right", "sprint", "stalk",
-	"pounce", "swipe", "dodge", "roar", "eat", "pause", "restart", "start",
+	"pounce", "swipe", "dodge", "roar", "eat", "pause", "restart", "start", "clamp",
 	"choice_1", "choice_2", "choice_3"]
 # Controller-only (the mouse covers these on keyboard).
 const PAD_ONLY := ["look_left", "look_right", "look_up", "look_down"]

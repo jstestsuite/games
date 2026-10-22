@@ -1,8 +1,8 @@
 extends SceneTree
 ## Tuning probe: puts the lion near one animal in different postures and reports how
 ## it reacts, then runs scripted chases (burst, run, pounce) against each species from
-## several distances. A chase counts as caught when a pounce lands (the grapple after
-## that is grapple_sim.gd's job). Not pass/fail. Use it after changing Tuning.
+## several distances. A chase counts as caught when a pounce lands (the ride after
+## that is ride_sim.gd's job). Not pass/fail. Use it after changing Tuning.
 ## Each chase runs RUNS times; results show catches / runs and the average time.
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/hunt_sim.gd
@@ -147,6 +147,7 @@ func _setup() -> void:
 	p.state = 0
 	p.grab_target = null
 	p.grapple = null
+	p.ride = null
 	p.pounces = TU.POUNCE_STOCK
 	GS.injured = false
 	Input.action_press("move_forward")

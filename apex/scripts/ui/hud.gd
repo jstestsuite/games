@@ -30,6 +30,8 @@ var rival_box: Control
 var rival_name: Label
 var rival_bar: Bar
 var grapple_view: GrappleView
+var ride_view: RideView
+var ride_log_label: Label
 var overlay: ColorRect
 var overlay_box: VBoxContainer
 var _msg_t := 0.0
@@ -103,6 +105,15 @@ func _ready() -> void:
 	grapple_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	grapple_view.visible = false
 	_hud_root.add_child(grapple_view)
+	ride_view = RideView.new()
+	ride_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ride_view.visible = false
+	_hud_root.add_child(ride_view)
+
+	ride_log_label = _label(16)
+	ride_log_label.modulate = Color(1, 1, 1, 0.85)
+	_place(ride_log_label, Vector2(0, 0.5), Vector2(34, -150), Vector2(620, 260))
+	_hud_root.add_child(ride_log_label)
 
 	compass = WindCompass.new()
 	_place(compass, Vector2(1, 0), Vector2(-130, 28), Vector2(96, 96))
@@ -132,9 +143,13 @@ func _process(delta: float) -> void:
 func update_from(player: Lion, wind: Vector2) -> void:
 	_hud_root.visible = GameState.phase == GameState.Phase.HUNTING
 	var acts := ["NOMAD", "CHALLENGE", "PRIDE"]
-	day_label.text = "DAY %d / %d  ·  %s" % [GameState.day, GameState.last_day(), acts[GameState.act]]
+	var practising := GameState.practice != ""
+	day_label.text = "PRACTICE" if practising \
+			else "DAY %d / %d  ·  %s" % [GameState.day, GameState.last_day(), acts[GameState.act]]
+	time_bar.visible = not practising
 	time_bar.value = GameState.day_time / Tuning.DAY_LENGTH
-	objective_label.text = _objective()
+	objective_label.text = "Y / Q  new animal   ·   R / Back  menu   ·   F1  tuning" if practising else _objective()
+	ride_log_label.visible = practising
 
 	health_bar.value = player.health / player.health_max()
 	health_bar.warn = player.health < player.health_max() * 0.3
@@ -143,6 +158,7 @@ func update_from(player: Lion, wind: Vector2) -> void:
 	strength_bar.value = GameState.mane_darkness()
 	strength_label.text = "STRENGTH  %.2f" % GameState.strength
 
+	charge_ring.visible = player.state != Lion.State.RIDE
 	charge_ring.value = player.charge / maxf(0.01, player.max_charge())
 	charge_ring.winded = player.winded_t > 0.0
 	charge_ring.bursting = player.bursting
@@ -161,8 +177,8 @@ func update_from(player: Lion, wind: Vector2) -> void:
 		Lion.State.EATING:
 			if is_instance_valid(player.eat_target):
 				bits.append("%s  (%d food left)" % ["GORGING" if player.gorging else "EATING", int(player.eat_target.food_left)])
-		Lion.State.TAKEDOWN:
-			bits.append("TAKEDOWN")
+		Lion.State.RIDE:
+			bits.append("RIDING")
 		Lion.State.CLINCH:
 			bits.append("CLINCH")
 		Lion.State.SPRAWL:
@@ -193,10 +209,14 @@ func update_from(player: Lion, wind: Vector2) -> void:
 		hints.append("Q / Y  roar%s" % ("" if player.roar_cd <= 0.0 else " (%.0f)" % player.roar_cd))
 	hint_label.text = "     ".join(hints)
 
-	grapple_view.g = player.grapple if player.in_grapple() else null
+	grapple_view.g = player.grapple if player.state == Lion.State.CLINCH else null
 	grapple_view.visible = grapple_view.g != null
-	status_label.visible = not grapple_view.visible
-	hint_label.visible = not grapple_view.visible
+	ride_view.r = player.ride if player.state == Lion.State.RIDE else null
+	ride_view.visible = ride_view.r != null
+	if ride_view.r and is_instance_valid(player.grab_target):
+		ride_view.species = player.grab_target.display_name()
+	status_label.visible = not (grapple_view.visible or ride_view.visible)
+	hint_label.visible = status_label.visible
 
 	var r: Rival = main.focus_rival() if main else null
 	rival_box.visible = r != null
@@ -254,7 +274,13 @@ func _centered(text: String, font_size: int, alpha := 1.0) -> Label:
 	return l
 
 
-func show_title() -> void:
+## The practice room's log, newest first.
+func set_ride_log(lines: Array[String]) -> void:
+	ride_log_label.text = "\n".join(lines)
+
+
+## `items` are the menu entries; `index` is the selected one.
+func show_title(items: Array = [], index := 0) -> void:
 	_clear_overlay()
 	overlay.color = Color(0.04, 0.03, 0.06, 0.35)
 	_centered("APEX", 96)
@@ -263,9 +289,15 @@ func show_title() -> void:
 		+ "Left click / F swipe  ·  Right click / Alt dodge  ·  Q roar  ·  E eat  ·  F1 tuning\n" \
 		+ "Controller: sticks move and look  ·  RT charge  ·  LT stalk  ·  A pounce  ·  X swipe  ·  B dodge  ·  Y roar  ·  RB eat\n" \
 		+ "Prey see movement and smell you downwind. Use tall grass. Your burst is short: get close first.\n" \
-		+ "Grab something: hold pounce and push the stick WITH each lurch the arrow warns of.\n" \
+		+ "Land on something and ride it: stay over its back as it cuts (watch its head, then the planted foot).\n" \
+		+ "RT / Shift clamps harder (it tires faster, but you're easier to throw). B / right-click lets go.\n" \
 		+ "Lions: \"!\" = swipe, \"!!\" = lunge. Pounce him to clinch; in a clinch push AWAY from red bites.", 18, 0.85)
-	_centered("\nPress Enter, click, or A to begin", 26)
+	for i in items.size():
+		var l := _centered(("›  %s  ‹" if i == index else "%s") % items[i], 26 if i == index else 22,
+			1.0 if i == index else 0.6)
+		if i == index:
+			l.add_theme_color_override("font_color", GOLD)
+	_centered("Up / down to choose  ·  Enter or A to start", 18, 0.7)
 
 
 func set_paused(p: bool) -> void:
@@ -391,8 +423,7 @@ class Bar extends Control:
 
 
 class GrappleView extends Control:
-	## The struggle, centre screen: the lurch arrow, and grip + takedown (prey) or the
-	## balance tug-of-war (rival).
+	## A clinch, centre screen: the lurch arrow and the balance tug-of-war.
 	var g: Grapple
 
 	func _ready() -> void:
@@ -407,9 +438,8 @@ class GrappleView extends Control:
 			return
 		var f := ThemeDB.fallback_font
 		var c := size * 0.5 + Vector2(0, -40)
-		var rival := g.kind == Grapple.Kind.RIVAL
 		var col := Color(1.0, 0.85, 0.25)
-		if rival and g.is_bite:
+		if g.is_bite:
 			col = Color(1.0, 0.22, 0.18)
 
 		# The arrow: grows and brightens through the warning, solid in the window.
@@ -431,14 +461,14 @@ class GrappleView extends Control:
 			draw_colored_polygon(head, cc)
 			if g.phase == Grapple.Phase.WINDOW:
 				draw_arc(c, 105.0, 0, TAU, 48, Color(1, 1, 1, 0.9), 5.0, true)
-			var word := "PUSH AWAY" if (rival and g.is_bite) else ("BRACE" if rival else "HOLD")
+			var word := "PUSH AWAY" if g.is_bite else "BRACE"
 			draw_string(f, c + Vector2(-148, 142), word, HORIZONTAL_ALIGNMENT_CENTER, 300, 30, dark)
 			draw_string(f, c + Vector2(-150, 140), word, HORIZONTAL_ALIGNMENT_CENTER, 300, 30, cc)
 
 		# What just happened.
 		if g.result_t < 0.6:
 			var good := g.last_result > 0
-			var txt := ("BRACED" if rival else "HELD") if good else ("SLIPPED" if not rival else "OVERPOWERED")
+			var txt := "BRACED" if good else "OVERPOWERED"
 			var rc := Color(0.6, 1.0, 0.6) if good else Color(1.0, 0.4, 0.3)
 			rc.a = 1.0 - g.result_t / 0.6
 			draw_string(f, c + Vector2(-150, -110), txt, HORIZONTAL_ALIGNMENT_CENTER, 300, 34, rc)
@@ -448,27 +478,74 @@ class GrappleView extends Control:
 		var y := size.y - 215.0
 		var x := size.x * 0.5 - bw * 0.5
 		draw_rect(Rect2(x - 16, y - 46, bw + 32, 104), Color(0, 0, 0, 0.35))
-		if rival:
-			# Balance: centre line, you on the right.
-			draw_rect(Rect2(x, y, bw, 14), Color(0, 0, 0, 0.5))
-			var mid := x + bw * 0.5
-			var px := mid + clampf(g.balance, -1.0, 1.0) * bw * 0.5
-			var bc := Color(0.6, 1.0, 0.6) if g.balance >= 0.0 else Color(1.0, 0.4, 0.3)
-			draw_rect(Rect2(minf(mid, px), y + 2, absf(px - mid), 10), bc)
-			draw_line(Vector2(mid, y - 4), Vector2(mid, y + 18), Color(1, 1, 1, 0.8), 2.0)
-			draw_string(f, Vector2(x, y + 34), "HE PINS YOU", HORIZONTAL_ALIGNMENT_LEFT, 160, 14, Color(1, 0.6, 0.5))
-			draw_string(f, Vector2(x + bw - 160, y + 34), "YOU PIN HIM", HORIZONTAL_ALIGNMENT_RIGHT, 160, 14, Color(0.7, 1, 0.7))
-		else:
-			draw_string(f, Vector2(x, y - 6), "GRIP", HORIZONTAL_ALIGNMENT_LEFT, 120, 14, Color(1, 1, 1, 0.9))
-			draw_rect(Rect2(x, y, bw, 10), Color(0, 0, 0, 0.5))
-			var gc := Color(1.0, 0.9, 0.6) if g.grip > 0.35 else Color(1.0, 0.35, 0.25)
-			draw_rect(Rect2(x + 2, y + 2, (bw - 4) * clampf(g.grip, 0.0, 1.0), 6), gc)
-			draw_string(f, Vector2(x, y + 30), "TAKEDOWN", HORIZONTAL_ALIGNMENT_LEFT, 120, 14, Color(1, 1, 1, 0.9))
-			draw_rect(Rect2(x, y + 36, bw, 10), Color(0, 0, 0, 0.5))
-			draw_rect(Rect2(x + 2, y + 38, (bw - 4) * clampf(g.progress, 0.0, 1.0), 6), Color(0.6, 1.0, 0.6))
-		var hint := "Hold Space / A  ·  yellow: push with it  ·  red: push away" if rival \
-				else "Hold Space / A to stay on  ·  push the stick with the arrow"
+		# Balance: centre line, you on the right.
+		draw_rect(Rect2(x, y, bw, 14), Color(0, 0, 0, 0.5))
+		var mid := x + bw * 0.5
+		var px := mid + clampf(g.balance, -1.0, 1.0) * bw * 0.5
+		var bc := Color(0.6, 1.0, 0.6) if g.balance >= 0.0 else Color(1.0, 0.4, 0.3)
+		draw_rect(Rect2(minf(mid, px), y + 2, absf(px - mid), 10), bc)
+		draw_line(Vector2(mid, y - 4), Vector2(mid, y + 18), Color(1, 1, 1, 0.8), 2.0)
+		draw_string(f, Vector2(x, y + 34), "HE PINS YOU", HORIZONTAL_ALIGNMENT_LEFT, 160, 14, Color(1, 0.6, 0.5))
+		draw_string(f, Vector2(x + bw - 160, y + 34), "YOU PIN HIM", HORIZONTAL_ALIGNMENT_RIGHT, 160, 14, Color(0.7, 1, 0.7))
+		var hint := "Hold Space / A  ·  yellow: push with it  ·  red: push away"
 		draw_string(f, Vector2(x, y - 22), hint, HORIZONTAL_ALIGNMENT_CENTER, bw, 15, Color(1, 1, 1, 0.85))
+
+
+class RideView extends Control:
+	## The ride, kept low and small so your eyes stay on the animal: its fight draining,
+	## your balance (with the safe zone, which narrows as you clamp), and your grip.
+	var r: Ride
+	var species := ""
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_d: float) -> void:
+		if visible:
+			queue_redraw()
+
+	func _draw() -> void:
+		if r == null:
+			return
+		var f := ThemeDB.fallback_font
+		var bw := 420.0
+		var x := size.x * 0.5 - bw * 0.5
+		var y := size.y - 150.0
+		draw_rect(Rect2(x - 16, y - 34, bw + 32, 118), Color(0, 0, 0, 0.3))
+
+		# Its fight: the catch meter. Empty = it goes down.
+		draw_string(f, Vector2(x, y - 10), species.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 200, 15, Color(1, 1, 1, 0.9))
+		draw_rect(Rect2(x, y - 4, bw, 10), Color(0, 0, 0, 0.5))
+		draw_rect(Rect2(x + 2, y - 2, (bw - 4) * clampf(r.fight, 0.0, 1.0), 6), Color(0.95, 0.6, 0.3))
+
+		# Balance: where you are, and the safe zone.
+		var by := y + 22.0
+		var mid := x + bw * 0.5
+		if Tuning.RIDE_SHOW_BALANCE:
+			draw_rect(Rect2(x, by, bw, 18), Color(0, 0, 0, 0.45))
+			var sw := r.safe * bw * 0.5
+			var calm := Color(0.5, 1.0, 0.55, 0.28 + 0.2 * r.clamp_amount)
+			draw_rect(Rect2(mid - sw, by, sw * 2.0, 18), calm)
+			draw_rect(Rect2(x, by, 6, 18), Color(1, 0.3, 0.2, 0.8))
+			draw_rect(Rect2(x + bw - 6, by, 6, 18), Color(1, 0.3, 0.2, 0.8))
+			var px := mid + clampf(r.x, -1.0, 1.0) * bw * 0.5
+			var ax := absf(r.x)
+			var mc := Color(0.6, 1.0, 0.6) if ax <= r.safe else (Color(1.0, 0.75, 0.3) if ax < 0.75 else Color(1.0, 0.3, 0.2))
+			draw_rect(Rect2(px - 4, by - 4, 8, 26), Color(0, 0, 0, 0.6))
+			draw_rect(Rect2(px - 3, by - 3, 6, 24), mc)
+
+		# Grip: drains while you're outside the safe zone.
+		var gy := by + 30.0
+		draw_rect(Rect2(x, gy, bw, 8), Color(0, 0, 0, 0.5))
+		var gc := Color(1.0, 0.9, 0.6) if r.grip > 0.35 else Color(1.0, 0.35, 0.25)
+		draw_rect(Rect2(x + 2, gy + 2, (bw - 4) * clampf(r.grip, 0.0, 1.0), 4), gc)
+		draw_string(f, Vector2(x, gy + 26), "GRIP", HORIZONTAL_ALIGNMENT_LEFT, 80, 13, Color(1, 1, 1, 0.75))
+		if r.clamp_amount > 0.1:
+			draw_string(f, Vector2(x + bw - 120, gy + 26), "CLAMPING", HORIZONTAL_ALIGNMENT_RIGHT, 120, 13,
+				Color(1, 0.85, 0.5, 0.5 + 0.5 * r.clamp_amount))
+		var how := "Stay over it" if r.model == Ride.Model.BALANCE else "Steer with it"
+		draw_string(f, Vector2(x, y - 40), how + "  ·  RT / Shift clamp  ·  B / right-click let go",
+			HORIZONTAL_ALIGNMENT_CENTER, bw, 14, Color(1, 1, 1, 0.6))
 
 
 class ChargeRing extends Control:

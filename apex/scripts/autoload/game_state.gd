@@ -23,6 +23,8 @@ var lionesses := 0           # how many still follow you
 var pride_since_day := 0     # the day you took the pride
 var injured := false         # thrown or pinned badly: weaker charge until you sleep
 var traits: Array[String] = []
+var practice := ""            # "" = the full game, else a practice room (see main.PRACTICE)
+var menu_index := 0           # last title-menu choice, kept across restarts
 
 ## Trait definitions. "mods" multiply values looked up through mod().
 const TRAITS := {
@@ -129,6 +131,7 @@ func _setup_input() -> void:
 	_bind("move_left", [KEY_A, KEY_LEFT])
 	_bind("move_right", [KEY_D, KEY_RIGHT])
 	_bind("sprint", [KEY_SHIFT])
+	_bind("clamp", [KEY_SHIFT])
 	_bind("stalk", [KEY_CTRL, KEY_C])
 	_bind("pounce", [KEY_SPACE])
 	_bind("swipe", [KEY_F])
@@ -144,10 +147,12 @@ func _setup_input() -> void:
 	_bind("start", [KEY_ENTER, KEY_SPACE])
 	_bind_mouse("swipe", MOUSE_BUTTON_LEFT)
 	_bind_mouse("dodge", MOUSE_BUTTON_RIGHT)
+	_bind_mouse("clamp", MOUSE_BUTTON_LEFT)
 
 	# Controller (Xbox names; PlayStation is the same positions).
-	# Left stick move, right stick look, RT sprint, LT stalk, A pounce (hold to grip),
-	# X swipe, B dodge, Y roar, RB eat, Start pause / restart, D-pad left/up/right = night choices.
+	# Left stick move, right stick look, RT sprint (and clamp while riding), LT stalk, A pounce,
+	# X swipe, B dodge (and let go while riding), Y roar, RB eat, Start pause / restart,
+	# Back restart (menu), D-pad left/up/right = night choices.
 	_bind_axis("move_left", JOY_AXIS_LEFT_X, -1.0)
 	_bind_axis("move_right", JOY_AXIS_LEFT_X, 1.0)
 	_bind_axis("move_forward", JOY_AXIS_LEFT_Y, -1.0)
@@ -157,6 +162,7 @@ func _setup_input() -> void:
 	_bind_axis("look_up", JOY_AXIS_RIGHT_Y, -1.0)
 	_bind_axis("look_down", JOY_AXIS_RIGHT_Y, 1.0)
 	_bind_axis("sprint", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	_bind_axis("clamp", JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	_bind_axis("stalk", JOY_AXIS_TRIGGER_LEFT, 1.0)
 	_bind_joy("pounce", JOY_BUTTON_A)
 	_bind_joy("swipe", JOY_BUTTON_X)
@@ -165,6 +171,7 @@ func _setup_input() -> void:
 	_bind_joy("eat", JOY_BUTTON_RIGHT_SHOULDER)
 	_bind_joy("pause", JOY_BUTTON_START)
 	_bind_joy("restart", JOY_BUTTON_START)
+	_bind_joy("restart", JOY_BUTTON_BACK)
 	_bind_joy("start", JOY_BUTTON_A)
 	_bind_joy("start", JOY_BUTTON_START)
 	_bind_joy("choice_1", JOY_BUTTON_DPAD_LEFT)
