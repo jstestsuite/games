@@ -29,6 +29,8 @@ static func _commit() -> String:
 	if code != 0 or output.is_empty():
 		return "unknown"
 	var dirty := []
-	OS.execute("git", ["-C", ProjectSettings.globalize_path("res://"), "status", "--porcelain", "--", "."], dirty)
+	# Only code and data count as "uncommitted" (not docs, and not these result files).
+	OS.execute("git", ["-C", ProjectSettings.globalize_path("res://"), "status", "--porcelain", "--",
+		"scripts", "shaders", "scenes", "project.godot", "tests", ":!tests/results"], dirty)
 	var hash := (output[0] as String).strip_edges()
 	return hash + (" (with uncommitted changes)" if not dirty.is_empty() and (dirty[0] as String).strip_edges() != "" else "")
