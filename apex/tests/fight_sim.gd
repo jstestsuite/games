@@ -9,6 +9,7 @@ extends SceneTree
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/fight_sim.gd
 
+const ProbeLog := preload("res://tests/probe_log.gd")
 const RUNS := 10
 const REACT_CHANCE := 0.7     # how often the bot dodges a tell it sees in time
 const REACTION_TIME := 0.28   # seconds from a tell appearing to the bot's dodge
@@ -100,6 +101,7 @@ func _physics_process(delta: float) -> bool:
 			if _scenario >= scenarios.size():
 				for l in _log:
 					print(l)
+				ProbeLog.save(self, "fight_sim", _log)
 				quit(0)
 				return true
 		_setup()

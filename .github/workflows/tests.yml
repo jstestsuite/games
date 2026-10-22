@@ -1,0 +1,18 @@
+# Runs each draft's checks (smoke, input and soak tests) on every push and pull request.
+# The tuning probes and screenshots are slower and stay manual: tools/run_tests.sh --probes.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  apex:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: tools/get_godot.sh
+      - name: Run tests
+        run: tools/run_tests.sh apex

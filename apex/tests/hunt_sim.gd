@@ -7,6 +7,7 @@ extends SceneTree
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/hunt_sim.gd
 
+const ProbeLog := preload("res://tests/probe_log.gd")
 const RUNS := 4
 
 var _main: Node
@@ -83,6 +84,7 @@ func _physics_process(delta: float) -> bool:
 		if _scenario >= scenarios.size():
 			for l in _log:
 				print(l)
+			ProbeLog.save(self, "hunt_sim", _log)
 			quit(0)
 			return true
 		_setup()
@@ -116,7 +118,7 @@ func _setup() -> void:
 	var sc = scenarios[_scenario]
 	var terrain = _main.terrain
 	_main.wind = Vector2(1, 0)
-	var gp := Vector3(0, 0, -40)
+	var gp := Vector3(0, 0, 35)   # flees toward -z: ~110 m of open ground before the rim
 	_g = load("res://scripts/actors/prey.gd").new()
 	_g.species = sc[1]
 	_g.terrain = terrain

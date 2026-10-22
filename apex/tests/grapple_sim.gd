@@ -8,6 +8,7 @@ extends SceneTree
 ##
 ## Run:  godot --headless --path . --fixed-fps 60 -s tests/grapple_sim.gd
 
+const ProbeLog := preload("res://tests/probe_log.gd")
 const RUNS := 12
 const REACT_CHANCE := 0.8
 const REACTION_TIME := 0.28
@@ -79,6 +80,7 @@ func _physics_process(delta: float) -> bool:
 			if _scenario >= scenarios.size():
 				for l in _log:
 					print(l)
+				ProbeLog.save(self, "grapple_sim", _log)
 				quit(0)
 				return true
 		_setup()
